@@ -168,4 +168,10 @@ MIT License - ver LICENSE
 
 ## ⭐ Star History
 
-[![Star History Chart](https://api.star-history.com/link/?user=tu-usuario&repos=g-mini-agent)](https://star-history.com/#tu-usuario&g-mini-agent&Date)
+<a href="https://www.star-history.com/angelgabrieljacintohuayllasco-lgtm/G-Mini-Agent">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=angelgabrieljacintohuayllasco-lgtm/G-Mini-Agent&style=landscape1&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=angelgabrieljacintohuayllasco-lgtm/G-Mini-Agent&style=landscape1" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=angelgabrieljacintohuayllasco-lgtm/G-Mini-Agent&style=landscape1" />
+ </picture>
+</a>
