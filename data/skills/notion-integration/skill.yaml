@@ -1,0 +1,20 @@
+name: "notion-integration"
+version: "1.0.0"
+description: "Integración con Notion para crear páginas, leer bases de datos y gestionar tareas."
+author: "G-Mini"
+category: "productividad"
+
+requires:
+  env:
+    - "NOTION_API_KEY"
+
+tools:
+  - name: "notion_query_database"
+    description: "Consulta una base de datos de Notion usando su ID. Parámetros: 'database_id' (str, requerido), 'filter' (dict, opcional)."
+    script: "tools/notion_api.py"
+    timeout_seconds: 60
+
+  - name: "notion_create_page"
+    description: "Crea una página en Notion dentro de una base de datos o página padre. Parámetros: 'parent_id' (str, requerido), 'is_database' (bool), 'title' (str), 'properties' (dict)."
+    script: "tools/notion_api.py"
+    timeout_seconds: 60

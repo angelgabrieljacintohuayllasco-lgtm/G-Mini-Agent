@@ -1,0 +1,40 @@
+name: "ffmpeg-tools"
+version: "1.0.0"
+description: "Herramientas de edición de video/audio vía ffmpeg. Permite cortar, unir, convertir, extraer audio, añadir subtítulos y más."
+author: "G-Mini"
+category: "creatividad"
+
+requires:
+  commands:
+    - "ffmpeg"
+
+tools:
+  - name: "ffmpeg_convert"
+    description: "Convierte un archivo multimedia a otro formato. Parámetros: 'input_path' (str), 'output_path' (str), 'extra_args' (list[str], opcional)."
+    script: "tools/ffmpeg_ops.py"
+    timeout_seconds: 300
+
+  - name: "ffmpeg_cut"
+    description: "Corta un segmento de video/audio. Parámetros: 'input_path' (str), 'output_path' (str), 'start' (str, ej '00:01:30'), 'duration' (str, ej '00:00:45')."
+    script: "tools/ffmpeg_ops.py"
+    timeout_seconds: 300
+
+  - name: "ffmpeg_merge"
+    description: "Une múltiples archivos multimedia. Parámetros: 'input_paths' (list[str]), 'output_path' (str)."
+    script: "tools/ffmpeg_ops.py"
+    timeout_seconds: 600
+
+  - name: "ffmpeg_extract_audio"
+    description: "Extrae la pista de audio de un video. Parámetros: 'input_path' (str), 'output_path' (str), 'format' (str, default 'mp3')."
+    script: "tools/ffmpeg_ops.py"
+    timeout_seconds: 300
+
+  - name: "ffmpeg_info"
+    description: "Obtiene información técnica de un archivo multimedia. Parámetros: 'input_path' (str)."
+    script: "tools/ffmpeg_ops.py"
+    timeout_seconds: 30
+
+  - name: "ffmpeg_thumbnail"
+    description: "Genera un thumbnail de un video en un tiempo dado. Parámetros: 'input_path' (str), 'output_path' (str), 'time' (str, ej '00:00:05')."
+    script: "tools/ffmpeg_ops.py"
+    timeout_seconds: 60

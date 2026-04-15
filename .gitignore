@@ -1,0 +1,118 @@
+# Configuraciones privadas del usuario
+config.user.yaml
+
+# Bases de datos (contienen datos usuario)
+data/*.db
+data/*.db-journal
+data/*.db-shm
+data/*.db-wal
+
+# Logs
+logs/
+*.log
+
+# Archivos temporales y generados
+tmp*/
+data/generated/
+data/gateway/artifacts/
+data/gateway/telegram/
+data/gateway/whatsapp/
+
+# Modelos ML (pesados, reproducibles)
+models/
+models/**/*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Entornos virtuales Python
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Pipenv
+Pipfile.lock
+
+# Poetry
+poetry.lock
+
+# pdm
+.pdm-build/
+.pdm-cache/
+.pdm-python/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Pytest
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# IDEs y Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generados
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Electron/Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dist/
+build/
+.electron/
+
+# Dependencias instaladas
+electron/package-lock.json
+
+# Pruebas y coverage
+.coverage
+htmlcov/
+.tox/
+.coverage.*
+coverage.xml
+*.cover
+.hypothesis/
+
+# Archivos del sistema
+*.bak
+*.tmp

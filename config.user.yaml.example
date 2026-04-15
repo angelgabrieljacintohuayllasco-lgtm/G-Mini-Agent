@@ -1,0 +1,28 @@
+# G-Mini Agent — config.user.yaml EJEMPLO
+# 1. Copia este archivo como "config.user.yaml"
+# 2. Edita tus preferencias
+# 3. Las API keys se configuran DESDE LA UI o REST API (almacenadas en Credential Manager)
+
+agent:
+  autonomy_level: supervisado  # libre | supervisado | asistido
+
+model_router:
+  default_provider: openai  # openai | google | anthropic | xai | etc.
+  default_model: gpt-4o-mini
+
+providers:
+  openai:
+    api_key_vault: openai_api  # Configurar desde UI
+    models: []  # Se auto-detectan
+  google:
+    api_key_vault: google_api
+    models:
+      - gemini-2.5-flash  # Tus modelos preferidos
+
+# Ejemplo MCP (tools externos)
+mcp:
+  enabled: false
+  servers: []
+
+# Copia más overrides aquí desde config.default.yaml
+# El merge es recursivo - solo necesitas las claves que quieres cambiar

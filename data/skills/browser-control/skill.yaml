@@ -1,0 +1,47 @@
+name: "browser-control"
+version: "1.0.0"
+description: "Control del navegador Chrome via extensión bridge de G-Mini."
+author: "gmini-core"
+category: "automatización"
+
+requires:
+  permissions:
+    - "browser.navigate"
+    - "browser.interact"
+  env: []
+
+tools:
+  - name: "browser_navigate"
+    description: "Navega a una URL en el navegador."
+    script: "tools/browser_ops.py"
+    timeout_seconds: 30
+
+  - name: "browser_click"
+    description: "Hace click en un selector CSS."
+    script: "tools/browser_ops.py"
+    timeout_seconds: 15
+
+  - name: "browser_type"
+    description: "Escribe texto en un selector CSS."
+    script: "tools/browser_ops.py"
+    timeout_seconds: 15
+
+  - name: "browser_extract"
+    description: "Extrae el texto de un selector CSS de la página actual."
+    script: "tools/browser_ops.py"
+    timeout_seconds: 15
+
+  - name: "browser_snapshot"
+    description: "Obtiene un snapshot accesible de la página actual."
+    script: "tools/browser_ops.py"
+    timeout_seconds: 15
+
+  - name: "browser_eval"
+    description: "Evalúa JavaScript en la página actual."
+    script: "tools/browser_ops.py"
+    timeout_seconds: 15
+
+  - name: "browser_get_dom"
+    description: "Obtiene la estructura DOM de la página con control de profundidad."
+    script: "tools/browser_ops.py"
+    timeout_seconds: 15

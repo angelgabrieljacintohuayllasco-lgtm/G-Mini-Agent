@@ -1,0 +1,19 @@
+id: dev-fullstack
+name: Desarrollo Full-Stack
+process: sequential
+agents:
+  - role: Arquitecto Backend
+    goal: Diseñar APIs, modelos de datos y lógica de negocio
+    model: null
+    can_delegate: false
+    max_iterations: 10
+  - role: Desarrollador Frontend
+    goal: Implementar UI/UX con HTML, CSS y JavaScript
+    model: null
+    can_delegate: false
+    max_iterations: 10
+  - role: Revisor de Código
+    goal: Auditar calidad, seguridad y buenas prácticas del código
+    model: null
+    can_delegate: false
+    max_iterations: 8

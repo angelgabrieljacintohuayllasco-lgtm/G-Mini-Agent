@@ -1,0 +1,19 @@
+id: analisis
+name: Análisis y Research
+process: sequential
+agents:
+  - role: Investigador
+    goal: Buscar y sintetizar información relevante
+    model: null
+    can_delegate: false
+    max_iterations: 10
+  - role: Analista de Datos
+    goal: Procesar datos, encontrar patrones y generar insights
+    model: null
+    can_delegate: false
+    max_iterations: 10
+  - role: Redactor de Informes
+    goal: Compilar hallazgos en reportes claros y accionables
+    model: null
+    can_delegate: false
+    max_iterations: 8

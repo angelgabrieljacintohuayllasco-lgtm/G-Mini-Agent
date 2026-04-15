@@ -1,0 +1,20 @@
+name: "code-executor"
+version: "1.0.0"
+description: "Ejecuta código Python en sandbox aislado con timeout y captura de salida."
+author: "gmini-core"
+category: "desarrollo"
+
+requires:
+  permissions:
+    - "system.exec"
+
+tools:
+  - name: "execute_python"
+    description: "Ejecuta código Python y devuelve stdout, stderr y resultado."
+    script: "tools/code_executor.py"
+    timeout_seconds: 60
+
+  - name: "execute_shell"
+    description: "Ejecuta un comando de shell y devuelve la salida."
+    script: "tools/code_executor.py"
+    timeout_seconds: 60

@@ -1,0 +1,42 @@
+name: "ide-control"
+version: "1.0.0"
+description: "Control de VS Code / Cursor via bridge de G-Mini."
+author: "gmini-core"
+category: "desarrollo"
+
+requires:
+  permissions:
+    - "ide.read"
+    - "ide.write"
+  env: []
+
+tools:
+  - name: "ide_open_file"
+    description: "Abre un archivo en el IDE."
+    script: "tools/ide_ops.py"
+    timeout_seconds: 10
+
+  - name: "ide_apply_edit"
+    description: "Aplica una edición a un archivo abierto en el IDE."
+    script: "tools/ide_ops.py"
+    timeout_seconds: 15
+
+  - name: "ide_diagnostics"
+    description: "Obtiene diagnósticos (errores/warnings) del IDE."
+    script: "tools/ide_ops.py"
+    timeout_seconds: 10
+
+  - name: "ide_symbols"
+    description: "Lista símbolos del archivo actual en el IDE."
+    script: "tools/ide_ops.py"
+    timeout_seconds: 10
+
+  - name: "ide_state"
+    description: "Obtiene el estado actual del IDE (archivo activo, workspace, etc.)."
+    script: "tools/ide_ops.py"
+    timeout_seconds: 10
+
+  - name: "ide_open_workspace"
+    description: "Abre un workspace/carpeta en el IDE."
+    script: "tools/ide_ops.py"
+    timeout_seconds: 10

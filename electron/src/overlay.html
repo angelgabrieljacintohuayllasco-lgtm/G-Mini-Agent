@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>G-Mini Overlay</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            background: transparent;
+            overflow: hidden;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            user-select: none;
+            -webkit-app-region: no-drag;
+        }
+        #overlay-content {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            max-width: 360px;
+            max-height: 260px;
+            background: rgba(15, 15, 25, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(100, 100, 255, 0.3);
+            border-radius: 16px;
+            padding: 16px;
+            color: #e0e0ff;
+            font-size: 14px;
+            line-height: 1.5;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(100, 100, 255, 0.3) transparent;
+        }
+        #overlay-content::-webkit-scrollbar { width: 4px; }
+        #overlay-content::-webkit-scrollbar-track { background: transparent; }
+        #overlay-content::-webkit-scrollbar-thumb { background: rgba(100, 100, 255, 0.4); border-radius: 2px; }
+
+        .status-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+            background: #4caf50;
+            animation: pulse 2s infinite;
+        }
+        .status-dot.thinking {
+            background: #ff9800;
+            animation: pulse 0.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        #overlay-text {
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+    </style>
+</head>
+<body>
+    <div id="overlay-content">
+        <span id="status-dot" class="status-dot"></span>
+        <span id="overlay-text">G-Mini Agent listo</span>
+    </div>
+
+    <script>
+        const overlayText = document.getElementById('overlay-text');
+        const statusDot = document.getElementById('status-dot');
+
+        // Recibir texto del main process
+        if (window.gmini) {
+            window.gmini.onOverlayText((text) => {
+                overlayText.textContent = text;
+            });
+        }
+    </script>
+</body>
+</html>

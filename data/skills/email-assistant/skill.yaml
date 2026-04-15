@@ -1,0 +1,38 @@
+name: "email-assistant"
+version: "1.1.0"
+description: "Gestión inteligente de correo electrónico (IMAP/SMTP) para leer, buscar, enviar, responder en hilos y hacer seguimiento."
+author: "G-Mini"
+category: "productividad"
+
+requires:
+  env:
+    - "GMINI_EMAIL_IMAP_SERVER"
+    - "GMINI_EMAIL_SMTP_SERVER"
+    - "GMINI_EMAIL_ADDRESS"
+    - "GMINI_EMAIL_PASSWORD"
+
+tools:
+  - name: "email_read_inbox"
+    description: "Lee los últimos correos de la bandeja de entrada o busca por remitente/asunto. Parámetros: 'limit' (int), 'folder' (str), 'query' (str)."
+    script: "tools/email_read.py"
+    timeout_seconds: 60
+
+  - name: "email_send"
+    description: "Redacta y envía un correo electrónico. Parámetros: 'to' (str, requerido), 'subject' (str), 'body' (str)."
+    script: "tools/email_send.py"
+    timeout_seconds: 60
+
+  - name: "email_reply"
+    description: "Responde a un email manteniendo el hilo. Parámetros: 'message_id' (str, Message-ID del email original), 'body' (str), 'reply_all' (bool, default false)."
+    script: "tools/email_reply.py"
+    timeout_seconds: 60
+
+  - name: "email_search_threads"
+    description: "Busca hilos de conversación por asunto o remitente. Parámetros: 'query' (str), 'folder' (str, default 'INBOX'), 'limit' (int, default 5)."
+    script: "tools/email_threads.py"
+    timeout_seconds: 60
+
+  - name: "email_check_followup"
+    description: "Verifica emails enviados sin respuesta. Parámetros: 'days_ago' (int, default 3), 'limit' (int, default 10)."
+    script: "tools/email_followup.py"
+    timeout_seconds: 60

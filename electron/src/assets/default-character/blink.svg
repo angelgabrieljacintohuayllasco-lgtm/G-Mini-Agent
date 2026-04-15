@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 140" width="120" height="140">
+  <!-- Head -->
+  <rect x="20" y="10" width="80" height="80" rx="18" fill="#2d2d3a" stroke="#5a5aff" stroke-width="2"/>
+  <!-- Eyes closed (blink) -->
+  <line x1="35" y1="45" x2="55" y2="45" stroke="#5a5aff" stroke-width="3" stroke-linecap="round"/>
+  <line x1="65" y1="45" x2="85" y2="45" stroke="#5a5aff" stroke-width="3" stroke-linecap="round"/>
+  <!-- Mouth closed -->
+  <line x1="42" y1="72" x2="78" y2="72" stroke="#5a5aff" stroke-width="2" stroke-linecap="round"/>
+  <!-- Antenna -->
+  <line x1="60" y1="10" x2="60" y2="0" stroke="#5a5aff" stroke-width="2"/>
+  <circle cx="60" cy="0" r="3" fill="#5a5aff"/>
+  <!-- Body -->
+  <rect x="30" y="95" width="60" height="40" rx="10" fill="#2d2d3a" stroke="#5a5aff" stroke-width="2"/>
+  <circle cx="60" cy="115" r="6" fill="#5a5aff" opacity="0.6"/>
+</svg>

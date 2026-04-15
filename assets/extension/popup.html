@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>G-Mini Agent Bridge</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 280px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      padding: 16px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .header img { width: 28px; height: 28px; }
+    .header h1 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #fff;
+    }
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      background: #16213e;
+      border-radius: 8px;
+      margin-bottom: 10px;
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .dot.connected { background: #00e676; box-shadow: 0 0 6px #00e676; }
+    .dot.disconnected { background: #ff5252; box-shadow: 0 0 6px #ff5252; }
+    .status-text {
+      font-size: 12px;
+      flex: 1;
+    }
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 8px;
+      border: none;
+      border-radius: 6px;
+      background: #0f3460;
+      color: #e0e0e0;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn:hover { background: #1a5276; }
+    .info {
+      font-size: 11px;
+      color: #888;
+      margin-top: 10px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <img src="icons/icon48.png" alt="G-Mini" />
+    <h1>G-Mini Agent Bridge</h1>
+  </div>
+
+  <div class="status-row">
+    <div id="dot" class="dot disconnected"></div>
+    <span id="status-text" class="status-text">Conectando...</span>
+  </div>
+
+  <button id="reconnect-btn" class="btn">Reconectar</button>
+
+  <p class="info">Puente de control para G-Mini Agent</p>
+
+  <script src="popup.js"></script>
+</body>
+</html>

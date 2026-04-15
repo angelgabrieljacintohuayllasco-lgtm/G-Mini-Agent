@@ -1,0 +1,15 @@
+name: "file-manager"
+version: "0.1.0"
+description: "Utilidades seguras para inspeccionar texto y archivos locales."
+author: "gmini-core"
+category: "productividad"
+
+requires:
+  permissions:
+    - "files.read"
+
+tools:
+  - name: "inspect_text_file"
+    description: "Lee un archivo de texto o texto inline y devuelve estadisticas basicas."
+    script: "tools/inspect_text_file.py"
+    timeout_seconds: 20

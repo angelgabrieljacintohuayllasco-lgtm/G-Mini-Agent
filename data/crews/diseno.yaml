@@ -1,0 +1,20 @@
+id: diseno
+name: "Diseño y Contenido"
+process: hierarchical
+manager_model: null
+agents:
+  - role: Director Creativo
+    goal: Definir concepto visual, paleta y estilo
+    model: null
+    can_delegate: true
+    max_iterations: 10
+  - role: "Diseñador UI"
+    goal: Crear wireframes, layouts y componentes visuales
+    model: null
+    can_delegate: false
+    max_iterations: 10
+  - role: Copywriter
+    goal: Redactar textos persuasivos y consistentes con la marca
+    model: null
+    can_delegate: false
+    max_iterations: 8

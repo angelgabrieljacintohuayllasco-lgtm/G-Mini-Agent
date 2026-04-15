@@ -1,0 +1,34 @@
+name: "social-media"
+version: "1.0.0"
+description: "Conectores de redes sociales. Soporta publicación, lectura y gestión en YouTube, Twitter/X, LinkedIn vía APIs oficiales."
+author: "G-Mini"
+category: "marketing"
+
+requires:
+  env: []
+
+tools:
+  - name: "youtube_upload"
+    description: "Sube un video a YouTube. Parámetros: 'video_path' (str), 'title' (str), 'description' (str), 'tags' (list[str], opcional), 'privacy' (str: 'private'|'unlisted'|'public'). Requiere GOOGLE_YOUTUBE_CREDENTIALS_JSON."
+    script: "tools/youtube_api.py"
+    timeout_seconds: 600
+
+  - name: "youtube_list_videos"
+    description: "Lista videos del canal. Parámetros: 'max_results' (int, default 10). Requiere GOOGLE_YOUTUBE_CREDENTIALS_JSON."
+    script: "tools/youtube_api.py"
+    timeout_seconds: 30
+
+  - name: "twitter_post"
+    description: "Publica un tweet. Parámetros: 'text' (str, max 280 chars), 'reply_to' (str, opcional). Requiere TWITTER_BEARER_TOKEN y TWITTER_ACCESS_TOKEN + TWITTER_ACCESS_SECRET + TWITTER_API_KEY + TWITTER_API_SECRET."
+    script: "tools/twitter_api.py"
+    timeout_seconds: 30
+
+  - name: "twitter_search"
+    description: "Busca tweets recientes. Parámetros: 'query' (str), 'max_results' (int, 10-100). Requiere TWITTER_BEARER_TOKEN."
+    script: "tools/twitter_api.py"
+    timeout_seconds: 30
+
+  - name: "linkedin_post"
+    description: "Publica en LinkedIn. Parámetros: 'text' (str), 'visibility' (str: 'PUBLIC'|'CONNECTIONS'). Requiere LINKEDIN_ACCESS_TOKEN."
+    script: "tools/linkedin_api.py"
+    timeout_seconds: 30

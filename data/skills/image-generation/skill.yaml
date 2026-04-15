@@ -1,0 +1,25 @@
+name: "image-generation"
+version: "1.0.0"
+description: "Generación de imágenes con IA usando DALL-E (OpenAI) y Stable Diffusion. Permite crear y editar imágenes por prompt."
+author: "G-Mini"
+category: "creatividad"
+
+requires:
+  env:
+    - "OPENAI_API_KEY"
+
+tools:
+  - name: "dalle_generate"
+    description: "Genera una imagen con DALL-E 3. Parámetros: 'prompt' (str), 'size' (str: '1024x1024'|'1792x1024'|'1024x1792'), 'quality' (str: 'standard'|'hd'), 'output_path' (str, opcional)."
+    script: "tools/image_gen.py"
+    timeout_seconds: 120
+
+  - name: "dalle_edit"
+    description: "Edita una imagen existente con DALL-E 2. Parámetros: 'prompt' (str), 'image_path' (str), 'mask_path' (str, opcional), 'output_path' (str, opcional)."
+    script: "tools/image_gen.py"
+    timeout_seconds: 120
+
+  - name: "dalle_variations"
+    description: "Genera variaciones de una imagen con DALL-E 2. Parámetros: 'image_path' (str), 'n' (int, 1-4), 'output_dir' (str, opcional)."
+    script: "tools/image_gen.py"
+    timeout_seconds: 120

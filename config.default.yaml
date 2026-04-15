@@ -1,0 +1,687 @@
+# G-Mini Agent — Configuración por defecto
+# Este archivo se copia como config.user.yaml en el primer arranque.
+# Los cambios del usuario se guardan en config.user.yaml.
+
+app:
+  name: "G-Mini Agent"
+  version: "0.1.0"
+  language: "es"
+  theme: "dark"            # dark | light | system
+  start_with_windows: false
+  minimize_to_tray: true
+  close_to_tray: true
+  start_hidden_to_tray: false
+  debug: false
+  mode: "normal"          # normal | programador | marketero | asesor_ventas | investigador | pentester | tutor | padre_digital | hermano_protector | gamer | creador
+
+modes:
+  custom: {}
+
+server:
+  host: "127.0.0.1"
+  port: 8765
+  cors_origins: ["*"]
+
+model_router:
+  mode: "manual"            # auto | manual
+  default_provider: "openai"
+  default_model: "gpt-5.4"
+  policy:
+    interactive_chat: "fast"
+    critical_actions: "high_reasoning"
+    private_data: "local_first"
+    batch_tasks: "low_cost"
+  fallback_order:
+    - "local:ollama"
+    - "openai:gpt-5-mini"
+    - "anthropic:claude-sonnet-4-6"
+  temperature: 0.7
+  max_tokens: 4096
+  hard_limits:
+    max_cost_per_task_usd: 5.0
+    max_latency_ms_interactive: 2500
+
+providers:
+  openai:
+    api_key_vault: "openai_api"
+    base_url: "https://api.openai.com/v1"
+    models:
+      - "gpt-5.4"              # Frontier: más capaz, razonamiento profesional (1.05M ctx)
+      - "gpt-5.4-pro"          # Versión pro de GPT-5.4, respuestas más precisas
+      - "gpt-5-mini"           # Rápido y eficiente en costo (1M ctx)
+      - "gpt-5-nano"           # El más rápido y barato de la serie GPT-5
+      - "gpt-4.1"              # Mejor modelo no-razonamiento (1M ctx)
+      - "gpt-5.3-codex"        # Más capaz para coding agéntico
+      - "gpt-5.2-codex"        # Coding optimizado para tareas largas
+  anthropic:
+    api_key_vault: "anthropic_api"
+    base_url: "https://api.anthropic.com/v1/messages"
+    models:
+      - "claude-opus-4-6"             # Más inteligente: agentes y coding (200K/1M ctx)
+      - "claude-sonnet-4-6"           # Mejor equilibrio velocidad/inteligencia (200K/1M ctx)
+      - "claude-haiku-4-5-20251001"   # El más rápido, inteligencia near-frontier (200K ctx)
+  google:
+    api_key_vault: "google_api"
+    base_url: "https://generativelanguage.googleapis.com/v1beta"
+    models:
+      - "gemini-3.1-pro-preview"                               # Inteligencia avanzada, coding agéntico (1M ctx)
+      - "gemini-3-flash-preview"                                # Rendimiento frontier a fracción del costo (1M ctx)
+      - "gemini-3.1-flash-lite-preview"                         # Flash-Lite: más rápido y económico (1M ctx)
+      - "gemini-2.5-pro"                                        # Pro estable (1M ctx)
+      - "gemini-2.5-flash"                                      # Flash estable
+      - "gemini-2.5-flash-lite"                                 # Flash-Lite estable
+      - "gemini-2.5-computer-use-preview-10-2025"               # Computer use (legacy; Gemini 3 ya lo incluye)
+      - "gemini-2.5-flash-native-audio-preview-12-2025"         # Live API — audio nativo 2.5
+      - "gemini-3.1-flash-live-preview"                         # Live API — audio/video en tiempo real 3.1
+  xai:
+    api_key_vault: "xai_api"
+    base_url: "https://api.x.ai/v1"
+    models:
+      - "grok-4-1-fast-reasoning"      # Razonamiento rápido, multimodal (2M ctx)
+      - "grok-4-1-fast-non-reasoning"  # Sin razonamiento, rápido (2M ctx)
+      - "grok-4"                        # Razonamiento completo (256K ctx)
+      - "grok-code-fast-1"              # Optimizado para código (256K ctx)
+  deepseek:
+    api_key_vault: "deepseek_api"
+    base_url: "https://api.deepseek.com"
+    models:
+      - "deepseek-chat"       # DeepSeek V3.2 modo no-thinking (128K ctx)
+      - "deepseek-reasoner"   # DeepSeek V3.2 modo thinking (128K ctx)
+  groq:
+    api_key_vault: "groq_api"
+    base_url: "https://api.groq.com/openai/v1"
+    models:
+      - "llama-3.3-70b-versatile"   # Llama 3.3 70B (128K ctx)
+      - "llama-3.1-8b-instant"      # Llama 3.1 8B ultrarrápido
+      - "mixtral-8x7b-32768"        # Mixtral 8x7B (32K ctx)
+      - "gemma2-9b-it"              # Gemma 2 9B
+  mistral:
+    api_key_vault: "mistral_api"
+    base_url: "https://api.mistral.ai/v1"
+    models:
+      - "mistral-large-latest"      # Mistral Large (128K ctx)
+      - "mistral-medium-latest"     # Mistral Medium
+      - "mistral-small-latest"      # Mistral Small, rápido y económico
+      - "codestral-latest"          # Codestral, optimizado para código
+  perplexity:
+    api_key_vault: "perplexity_api"
+    base_url: "https://api.perplexity.ai"
+    models:
+      - "sonar-pro"                 # Sonar Pro: búsqueda avanzada
+      - "sonar"                     # Sonar: búsqueda rápida
+  openrouter:
+    api_key_vault: "openrouter_api"
+    base_url: "https://openrouter.ai/api/v1"
+    models:
+      - "openai/gpt-4o"             # Acceso federado a múltiples modelos
+      - "anthropic/claude-3.5-sonnet"
+      - "meta-llama/llama-3.1-405b-instruct"
+  cohere:
+    api_key_vault: "cohere_api"
+    base_url: "https://api.cohere.ai/v1"
+    models:
+      - "command-r-plus"            # Command R+: RAG y herramientas (128K ctx)
+      - "command-r"                 # Command R: rápido y eficiente
+      - "command-light"             # Command Light: el más rápido
+  ollama:
+    base_url: "http://localhost:11434/v1"
+    models: []              # Se detectan automáticamente
+  lmstudio:
+    base_url: "http://localhost:1234/v1"
+    models: []              # Se detectan automáticamente
+
+vision:
+  enabled: true             # Vision activa para el agente
+  mode: "token_saver"       # token_saver | computer_use
+  ocr_engine: "auto"        # auto | tesseract | easyocr | paddleocr
+  ocr_multi_engine: true    # Si un motor OCR falla o no devuelve texto, intenta con el siguiente
+  ui_elements_enabled: true # Adjunta elementos de UI detectados al analisis de pantalla
+  ui_detector: "auto"       # auto | heuristic | omniparser
+  ui_elements_max: 30
+  capture_interval_ms: 100
+  omniparser_enabled: true
+  omniparser_model: ""      # Ruta exacta opcional a pesos YOLO/OmniParser (.pt/.onnx)
+  omniparser_model_dir: "models/omniparser"
+  omniparser_labels: ""     # Ruta opcional a labels/classes (txt/yaml/json)
+  omniparser_repo_id: "microsoft/OmniParser-v2.0"
+  omniparser_revision: "main"
+  omniparser_bundle_files:
+    - "icon_detect/model.pt"
+    - "icon_detect/model.yaml"
+    - "icon_detect/train_args.yaml"
+  omniparser_caption_enabled: true
+  omniparser_caption_max_regions: 12
+  omniparser_caption_max_new_tokens: 24
+  omniparser_caption_device: "auto"
+  omniparser_caption_repo_id: "microsoft/OmniParser-v2.0"
+  omniparser_caption_base_repo_id: "microsoft/Florence-2-base-ft"
+  omniparser_caption_bundle_files:
+    - "icon_caption/config.json"
+    - "icon_caption/generation_config.json"
+    - "icon_caption/model.safetensors"
+  omniparser_caption_runtime_files:
+    - "configuration_florence2.py"
+    - "modeling_florence2.py"
+    - "processing_florence2.py"
+    - "preprocessor_config.json"
+    - "tokenizer.json"
+    - "tokenizer_config.json"
+    - "vocab.json"
+  omniparser_confidence_threshold: 0.28
+  omniparser_ocr_enrichment: true
+  capture_retry_attempts: 3
+  capture_slo_target_ms: 50
+  ocr_retry_attempts: 2
+  retry_initial_delay_ms: 250
+  retry_max_delay_ms: 1500
+  retry_backoff_multiplier: 2.0
+  max_screenshot_width: 1920   # Ancho máximo de screenshot enviado al LLM (0 = sin límite)
+
+automation:
+  enabled: true             # Automatización activa para agente autónomo
+  action_delay_ms: 200
+  kill_switch_hotkey: "ctrl+shift+escape"
+  input_event_buffer_size: 200
+  hotkey_default_cooldown_ms: 500
+  input_listener_enabled_on_startup: false
+  desktop_preview_default_interval_seconds: 0.5
+  forbidden_zones: []
+  dpi_aware: true
+  max_loop_iterations: 25   # Máximo de turnos LLM→acción por mensaje
+  loop_timeout_seconds: 300 # Timeout total del loop (5 min)
+  action_retry_attempts: 2
+  llm_retry_attempts: 2
+  retry_initial_delay_ms: 300
+  retry_max_delay_ms: 2000
+  retry_backoff_multiplier: 2.0
+  stagnation_threshold: 3
+  internal_error_retry_limit: 3
+
+browser:
+  # --- Extensión Chrome "G-Mini Agent Bridge" ---
+  extension_path: "assets/extension"       # Ruta relativa al root del proyecto
+  extension_connect_timeout_s: 20          # Tiempo de espera para que la extensión conecte
+  extension_auto_install: true             # Instalar automáticamente vía Computer Use si no está
+  # --- Backend por modo ---
+  human_profile_backend: "extension"       # Perfiles humanos → extensión Chrome nativa
+  automation_profile_backend: "browser_use" # Perfiles de automatización → browser-use
+  # --- browser-use config ---
+  browser_use:
+    headless: false
+    highlight_elements: true
+    keep_alive: true
+    enable_default_extensions: true
+
+terminals:
+  default: "powershell"
+  max_sessions: 10
+  exec_approvals_enabled: false
+  exec_approval_host_key: ""
+  exec_approvals_by_host:
+    default-host:
+      allowed_commands: []
+      allowed_patterns: []
+      denied_patterns:
+        - "rm\\s+-rf"
+        - "\\bsudo\\b"
+        - "chmod\\s+777"
+  preferences:
+    node_js: "wsl_ubuntu"
+    python: "powershell"
+    git: "gitbash"
+    docker: "wsl_ubuntu"
+    windows_admin: "powershell"
+
+editors:
+  preferred: "vscode"
+  paths:
+    vscode: ""
+    vscode-insiders: ""
+    cursor: ""
+
+mcp:
+  enabled: false
+  protocol_version: "2024-11-05"
+  request_timeout_seconds: 20
+  servers: []               # Lista de servidores MCP configurados por el usuario
+
+skills:
+  enabled: true
+  preferred: []             # Nombres o ids de skills que quieres priorizar
+  custom_paths: []          # Rutas locales a skills externos o personalizados
+  disabled_ids: []          # Skills desactivadas lógicamente sin tocar el paquete instalado
+
+skills_security:
+  default_new_skill_mode: "sandbox"
+  enforce_least_privilege: true
+  max_timeout_seconds: 120
+  allow_env: []
+
+scheduler:
+  enabled: true
+  db_path: "data/scheduler.db"
+  poll_interval_seconds: 2.0
+
+gateway:
+  enabled: true
+  db_path: "data/gateway.db"
+  session_router_enabled: true
+  default_channel: "local_app"
+  default_session_key: "main"
+  channels:
+    local_app:
+      enabled: true
+      deliver_realtime: true
+    telegram:
+      enabled: false
+      bot_token_vault: "telegram_bot"
+      default_chat_id: ""
+      allowed_chat_ids: []
+      group_activation_aliases: ["g-mini", "gmini", "agente"]
+      poll_interval_seconds: 3.0
+      long_poll_timeout_seconds: 20
+      base_url: "https://api.telegram.org"
+    whatsapp:
+      enabled: false
+      default_chat_id: ""
+      allowed_chat_ids: []
+      group_activation_aliases: ["g-mini", "gmini", "agente"]
+      node_executable: "node"
+      bridge_workdir: "assets/whatsapp-bridge"
+      bridge_script_path: "assets/whatsapp-bridge/bridge.js"
+      session_name: "default"
+      startup_timeout_seconds: 45
+    discord:
+      enabled: false
+      bot_token_vault: "discord_bot"
+      default_channel_id: ""
+      allowed_guild_ids: []
+      allowed_channel_ids: []
+      group_activation_aliases: ["g-mini", "gmini", "agente"]
+      fake_mode: false
+    slack:
+      enabled: false
+      bot_token_vault: "slack_bot"
+      app_token_vault: "slack_app"
+      default_channel_id: ""
+      allowed_channel_ids: []
+      alias: "g-mini"
+  notifications:
+    scheduler_success_targets: ["local_app:main"]
+    scheduler_error_targets: ["local_app:main"]
+
+# --- Optimización automática de costos (Fase 9.4) ---
+cost_optimization:
+  enabled: false              # Activar auto-switch de modelos y compresión de contexto
+  # Umbrales de presión presupuestaria (% de uso del límite más restrictivo)
+  pressure_threshold_medium: 60.0
+  pressure_threshold_high: 80.0
+  # Comprimir contexto si los tokens de entrada superan este valor Y hay presión presupuestaria
+  compress_context_above_tokens: 40000
+  compress_keep_recent_messages: 16
+  # Cadena de downgrade: modelos ordenados de más barato a más caro.
+  # El optimizador buscará el modelo más barato de esta lista que sea apropiado
+  # para la criticidad de la tarea.
+  downgrade_chain:
+    - provider: "google"
+      model: "gemini-3.1-flash-lite-preview"   # ~$0.50/M total — ultra bajo costo
+    - provider: "xai"
+      model: "grok-4-1-fast-non-reasoning"     # ~$0.70/M total — rápido
+    - provider: "openai"
+      model: "gpt-5-nano"                      # ~$0.45/M total — rápido y barato
+    - provider: "openai"
+      model: "gpt-5-mini"                      # ~$2.25/M total — buen balance
+    - provider: "deepseek"
+      model: "deepseek-chat"                   # ~$1.37/M total — económico
+    - provider: "google"
+      model: "gemini-3-flash-preview"          # ~$2.80/M total — rápido
+    - provider: "anthropic"
+      model: "claude-haiku-4-5-20251001"       # ~$6.00/M total — inteligente
+  # Provider local como fallback cuando la presión es alta y la tarea no es crítica.
+  # Requiere Ollama o LM Studio corriendo. Dejar vacío para desactivar.
+  local_fallback_provider: ""    # "ollama" o "lmstudio"
+  local_fallback_model: ""       # Ej: "llama3", "mistral", o "" para auto-detectar
+
+budget:
+  enabled: false
+  db_path: "data/costs.db"
+  daily_limit_usd: 50.0
+  monthly_limit_usd: 500.0
+  warning_threshold_percent: 80
+  subagent_default_task_limit_usd: 1.0
+  subagent_parent_budget_share: 0.40
+  weekly_report_gateway_targets: []  # Ej: ["telegram:ops", "whatsapp:admin"]
+  mode_task_limits_usd:
+    normal: 5.0
+    programador: 10.0
+    investigador: 5.0
+    marketero: 3.0
+    creador: 3.0
+    asesor_ventas: 2.0
+  # Precios base editables por modelo.
+  # Para aliases preview/familias no publicadas exactamente, se usa la tarifa
+  # oficial mas cercana y conservadora disponible al momento de sembrar defaults.
+  model_pricing:
+    gpt-5.4:
+      input_per_million_usd: 2.5
+      output_per_million_usd: 15.0
+    gpt-5.4-pro:
+      input_per_million_usd: 15.0
+      output_per_million_usd: 120.0
+    gpt-5-mini:
+      input_per_million_usd: 0.25
+      output_per_million_usd: 2.0
+    gpt-5-nano:
+      input_per_million_usd: 0.05
+      output_per_million_usd: 0.4
+    gpt-4.1:
+      input_per_million_usd: 2.0
+      output_per_million_usd: 8.0
+    gpt-5.3-codex:
+      input_per_million_usd: 1.75
+      output_per_million_usd: 14.0
+    gpt-5.2-codex:
+      input_per_million_usd: 1.75
+      output_per_million_usd: 14.0
+    claude-opus-4-6:
+      input_per_million_usd: 15.0
+      output_per_million_usd: 75.0
+    claude-sonnet-4-6:
+      input_per_million_usd: 3.0
+      output_per_million_usd: 15.0
+    claude-haiku-4-5-20251001:
+      input_per_million_usd: 1.0
+      output_per_million_usd: 5.0
+    gemini-3.1-pro-preview:
+      input_per_million_usd: 2.5
+      output_per_million_usd: 15.0
+    gemini-3-flash-preview:
+      input_per_million_usd: 0.3
+      output_per_million_usd: 2.5
+    gemini-3.1-flash-lite-preview:
+      input_per_million_usd: 0.1
+      output_per_million_usd: 0.4
+    grok-4-1-fast-reasoning:
+      input_per_million_usd: 0.2
+      output_per_million_usd: 0.5
+    grok-4-1-fast-non-reasoning:
+      input_per_million_usd: 0.2
+      output_per_million_usd: 0.5
+    grok-4:
+      input_per_million_usd: 3.0
+      output_per_million_usd: 15.0
+    grok-code-fast-1:
+      input_per_million_usd: 0.2
+      output_per_million_usd: 1.5
+    deepseek-chat:
+      input_per_million_usd: 0.27
+      output_per_million_usd: 1.1
+      deepseek-reasoner:
+        input_per_million_usd: 0.55
+        output_per_million_usd: 2.19
+
+payments:
+  enabled: true
+  spend_permissions_mode: "ask_always"  # deny_all | ask_always | ask_above_x | auto_approve_under_x
+  ask_above_usd: 25.0
+  auto_approve_under_usd: 5.0
+  default_account_id: ""
+  accounts: []
+  # Cada cuenta puede definir:
+  # id, name, type, currency, enabled, last4,
+  # per_transaction_limit_usd, daily_limit_usd, monthly_limit_usd y allowed_uses.
+
+security:
+  virustotal:
+    api_key_vault: "virustotal_api"
+    timeout_seconds: 120
+    poll_interval_seconds: 5
+  # Directorios adicionales permitidos para escritura (además de Desktop, Documents, Downloads, .gmini, project root)
+  # Rutas del sistema (C:\Windows, C:\Program Files, /usr, /etc, etc.) están bloqueadas siempre
+  allowed_write_dirs: []
+
+  # ── Phase 10: RBAC ──
+  rbac:
+    enabled: true
+    db_path: "data/rbac.db"
+
+  # ── Phase 10: Audit ──
+  audit:
+    enabled: true
+    db_path: "data/audit.db"
+    retention_days: 90
+
+  # ── Phase 10: Sandbox ──
+  sandbox:
+    enabled: true
+    timeout_seconds: 30
+    max_memory_mb: 256
+    max_output_bytes: 50000
+    network_enabled: false
+
+  # ── Phase 10: Rate Limiting ──
+  rate_limits:
+    api_general:
+      max_requests: 60
+      window_seconds: 60
+    api_actions:
+      max_requests: 30
+      window_seconds: 60
+    api_auth:
+      max_requests: 10
+      window_seconds: 60
+    gateway_user:
+      max_requests: 20
+      window_seconds: 60
+    sandbox_exec:
+      max_requests: 10
+      window_seconds: 300
+
+  # ── Phase 10: Injection Detection ──
+  injection_detection:
+    enabled: true
+    block_threshold: 0.70
+
+  # ── Phase 10: Ethical Restrictions ──
+  ethical:
+    enabled: true
+
+voice:
+  enabled: false            # Se activa en Fase 3
+  auto_tts: false           # Sintetizar voz automáticamente en cada respuesta
+  tts_primary: "melotts"    # melotts | elevenlabs
+  tts_fallback: "melotts"
+  stt_engine: "faster-whisper"
+  stt_model: "large-v3"
+  stt_language: "es"
+  elevenlabs:
+    api_key_vault: "elevenlabs_api"
+    default_voice: ""
+    model: "eleven_multilingual_v2"
+    streaming: true
+    latency_optimization: 3
+
+character:
+  type: "2d"                # 2d | 3d
+  skin: "default"
+  default_size: 200
+  default_opacity: 100
+  overlay_position:
+    x: -1                   # -1 = esquina inferior derecha
+    y: -1
+  blink_interval_min_s: 3
+  blink_interval_max_s: 5
+  blink_duration_ms: 150
+
+agent:
+  system_prompt_file: "data/prompts/system_prompt.md"  # Ruta relativa al root del proyecto
+  autonomy_level: "supervisado"                        # libre | supervisado | asistido
+  auto_dry_run_below_threshold: true                   # Simula antes de ejecutar si el critic queda bajo umbral
+  critic_thresholds:
+    reading: 0.55
+    interactive: 0.60
+    files: 0.75
+    publishing: 0.85
+    payments: 0.95
+    system: 0.85
+  download_tool: "python -m yt_dlp"                    # Herramienta CLI para descargar videos
+  download_output_dir: "%USERPROFILE%\\Downloads\\G-Mini-Agent"  # Carpeta destino de descargas
+  blocked_sites_enabled: false                         # Activa bloqueo configurable de dominios
+  blocked_sites: []                                    # Lista editable desde Settings
+
+# ═══ Model Assignments para Sub-Agentes ═══
+# Mapea tipo de tarea → provider:modelo preferido para sub-agentes ejecutores.
+# El agente principal consulta API keys disponibles y asigna automáticamente.
+# Si el provider no tiene API key configurada, usa el modelo por defecto del router.
+model_assignments:
+  programacion: "anthropic:claude-opus-4-6"            # Sub-agente programador
+  frontend: "google:gemini-2.5-pro-preview-06-05"     # Sub-agente frontend
+  lectura: "anthropic:claude-haiku-4-5-20251001"       # Sub-agente lector/resumidor (lightweight)
+  creatividad: "openai:gpt-4o"                         # Sub-agente creativo
+  matematicas: "deepseek:deepseek-reasoner"            # Sub-agente razonamiento
+  sin_censura: "xai:grok-3"                            # Sub-agente sin restricciones
+  analisis: ""                                         # Hereda modelo por defecto
+  general: ""                                          # Hereda modelo por defecto
+
+prompts:
+  system_base: ""
+  task_request_hint: ""
+  browser_task_hint: ""
+  no_actions_reinforcement: ""
+  screenshot_feedback: ""
+  action_feedback_user: ""
+  browser_recovery_feedback: ""
+  file_recovery_feedback: ""
+  dry_run_preview: ""
+  stagnation_feedback: ""
+  delegation_planner: ""
+  subagent_worker_system: ""
+  subagent_executor_system: ""
+  subagent_worker_user: ""
+  critic_system: ""
+  critic_user: ""
+  mode_behavior: {}
+
+adb:
+  enabled: false
+  device_serial: ""
+  wifi_ip: ""
+  wifi_port: 5555
+
+# ═══ Phase 7: Nodes (Dispositivos Conectados) ═══
+nodes:
+  enabled: false
+  db_path: "data/gateway.db"
+  pairing_token_ttl_seconds: 300
+  heartbeat_interval_seconds: 30
+  stale_timeout_seconds: 120
+  max_nodes: 20
+
+# ═══ Phase 7: Smart Home / IoT ═══
+smart_home:
+  enabled: false
+  db_path: "data/gateway.db"
+  primary_provider: "home_assistant"
+  home_assistant:
+    url: "http://localhost:8123"
+    token: ""           # O usar vault: get_api_key("home_assistant")
+  refresh_interval_seconds: 60
+
+# ═══ Phase 8: Canvas ═══
+canvas:
+  enabled: true
+  db_path: "data/gateway.db"
+  max_canvases: 50
+  max_versions_per_canvas: 30
+
+# ═══ Phase 11: Memory Avanzada + Knowledge Graph ═══
+memory:
+  db_path: "data/memory_ltm.db"
+  max_memories: 5000
+  compression_db_path: "data/memory_ltm.db"
+  compression_trigger_tokens: 80000
+  compression_target_tokens: 20000
+  knowledge_graph_db_path: "data/memory_ltm.db"
+
+# ═══ Phase 12: RPA + Macros + Rollback ═══
+macros:
+  enabled: true
+  db_path: "data/macros.db"
+
+rollback:
+  enabled: true
+  db_path: "data/rollback.db"
+  backup_dir: "data/rollback_backups"
+  max_snapshots: 20
+
+# ═══ Phase 13: Analytics + DAG Planner + Goal Engine ═══
+dag:
+  enabled: true
+  db_path: "data/dag.db"
+
+goals:
+  enabled: true
+  db_path: "data/goals.db"
+
+analytics:
+  enabled: true
+  db_path: "data/analytics.db"
+  retention_days: 90
+
+# ═══ Phase 14: Event Bus + Self-Healing + Versionado ═══
+event_bus:
+  enabled: true
+  db_path: "data/event_bus.db"
+  retention_days: 30
+
+self_healing:
+  enabled: true
+  max_retries_per_step: 3
+  max_step_seconds: 120
+  on_exhaustion: "handoff"   # handoff | pause | cancel
+
+versioning:
+  enabled: true
+  db_path: "data/versioning.db"
+  max_versions: 50
+
+# ═══ Phase 15: ETL + Alerts + RLHF ═══
+etl:
+  enabled: true
+  db_path: "data/etl.db"
+
+alerts:
+  enabled: true
+  db_path: "data/alerts.db"
+  retention_days: 30
+
+rlhf:
+  enabled: true
+  db_path: "data/rlhf.db"
+
+# ═══ Phase 16: Autonomous Agents ═══
+agents:
+  enabled: true
+  db_path: "data/agents.db"
+
+# ═══ Phase 17: Productivity Suite ═══
+productivity:
+  enabled: true
+  db_path: "data/productivity.db"
+
+# ═══ Phase 18: Offline + Sync + Auto-Update ═══
+offline:
+  enabled: true
+  check_interval: 30
+
+sync:
+  enabled: true
+  db_path: "data/sync.db"
+  device_id: ""
+
+updater:
+  enabled: true
+  db_path: "data/updater.db"
+  channel: "stable"
+  auto_check: true
+  check_interval_hours: 24

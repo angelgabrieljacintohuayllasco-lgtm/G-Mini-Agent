@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src ws://127.0.0.1:8765 http://127.0.0.1:8765; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline';">
+    <title>G-Mini Agent</title>
+    <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+    <div id="titlebar" class="titlebar">
+        <div class="titlebar-drag">
+            <button id="btn-toggle-sidebar" class="btn-toggle-sidebar" title="Historial (Ctrl+H)">☰</button>
+            <img src="../assets/icon.png" alt="G-Mini Agent" class="titlebar-icon-img">
+            <span class="titlebar-text">G-Mini Agent</span>
+        </div>
+        <div class="titlebar-controls">
+            <button id="btn-toggle-code" class="titlebar-btn" title="Workspace y codigo">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            </button>
+            <button id="btn-settings" class="titlebar-btn" title="Configuracion">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            </button>
+            <button id="btn-minimize" class="titlebar-btn" title="Minimizar">─</button>
+            <button id="btn-close" class="titlebar-btn titlebar-btn-close" title="Cerrar">✕</button>
+        </div>
+    </div>
+
+    <div class="app-layout">
+        <div id="sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <h3>Historial</h3>
+                <button id="btn-new-chat" class="btn-new-chat">+ Nuevo</button>
+            </div>
+            <div id="chat-list" class="chat-list">
+                <div class="chat-list-empty">
+                    <div class="chat-list-empty-icon">💬</div>
+                    <div>No hay conversaciones guardadas</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div id="status-bar" class="status-bar">
+                <span id="status-indicator" class="status-dot idle"></span>
+                <span id="status-text">Conectando...</span>
+                <span id="mode-label" class="model-label">modo: ---</span>
+                <span id="model-label" class="model-label">---</span>
+                <div class="agent-control-group">
+                    <button id="btn-agent-start" class="agent-control-btn" type="button" title="Reanudar agente" disabled>Start</button>
+                    <button id="btn-agent-pause" class="agent-control-btn" type="button" title="Pausar agente" disabled>Pause</button>
+                    <button id="btn-agent-stop" class="agent-control-btn stop" type="button" title="Detener agente" disabled>Stop</button>
+                </div>
+            </div>
+            <div id="subagents-bar" class="subagents-bar hidden"></div>
+            <div id="terminals-bar" class="subagents-bar hidden"></div>
+
+            <div class="workspace-shell">
+                <div class="chat-section">
+                    <div id="chat-container" class="chat-container">
+                        <div id="messages" class="messages">
+                            <div class="message system-message">
+                                <p>Bienvenido a <strong>G-Mini Agent</strong>. Escribe un mensaje para comenzar.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="input-area" class="input-area">
+                        <div class="input-row">
+                            <textarea
+                                id="user-input"
+                                class="user-input"
+                                placeholder="Escribe un mensaje..."
+                                rows="1"
+                                autofocus
+                            ></textarea>
+                            <button id="btn-send" class="btn-send" title="Enviar (Enter)">▶</button>
+                        </div>
+                        <div class="input-footer">
+                            <span id="char-count" class="char-count">0</span>
+                            <button id="btn-attach" class="btn-small btn-disabled" title="Adjuntar imagen (próximamente)" disabled>📎</button>
+                            <button id="btn-voice" class="btn-small" title="Entrada por voz">🎙</button>
+                            <button id="btn-realtime" class="btn-small" title="Conversación en tiempo real">📞</button>
+                            <button id="btn-video-stream" class="btn-small" title="Mostrar pantalla a la IA (Live API streaming)" style="display:none">🖥️</button>
+                        </div>
+                    </div>
+                </div>
+
+                <aside id="code-panel" class="code-panel collapsed">
+                    <div class="code-panel-header">
+                        <div>
+                            <div class="code-panel-title">Workspace y Scheduler</div>
+                            <div id="code-panel-subtitle" class="code-panel-subtitle">Codigo local y tareas programadas dentro de G-Mini</div>
+                        </div>
+                        <div class="code-panel-header-actions">
+                            <button id="btn-refresh-code" class="btn-secondary btn-panel-action" title="Recargar workspace">Recargar</button>
+                            <button id="btn-close-code" class="titlebar-btn" title="Cerrar panel">✕</button>
+                        </div>
+                    </div>
+
+                    <div class="code-panel-tabs">
+                        <button id="btn-code-tab-workspace" class="code-tab is-active" type="button">Workspace</button>
+                        <button id="btn-code-tab-scheduler" class="code-tab" type="button">Scheduler</button>
+                        <button id="btn-code-tab-canvas" class="code-tab" type="button">Canvas</button>
+                        <button id="btn-code-tab-security" class="code-tab" type="button">Seguridad</button>
+                        <button id="btn-code-tab-analytics" class="code-tab" type="button">Analytics</button>
+                    </div>
+
+                    <div id="code-view-workspace" class="code-panel-view is-active">
+                        <div class="code-toolbar">
+                            <input id="code-workspace-path" class="setting-input code-path-input" type="text" placeholder="Ruta del proyecto o workspace">
+                            <button id="btn-load-code-workspace" class="btn-secondary">Abrir</button>
+                        </div>
+                        <div id="code-status" class="setting-help-text code-status">Abre el panel para cargar un proyecto.</div>
+
+                        <div class="code-panel-body">
+                            <section class="code-section">
+                                <div class="code-section-header">Resumen del proyecto</div>
+                                <div id="code-snapshot-summary" class="code-summary-grid"></div>
+                            </section>
+
+                            <section class="code-section">
+                                <div class="code-section-header">Cambios Git</div>
+                                <div id="code-changed-files" class="code-list code-list-compact"></div>
+                            </section>
+
+                            <section class="code-section code-section-grow">
+                                <div class="code-section-header">Archivos</div>
+                                <div id="code-file-list" class="code-list"></div>
+                            </section>
+
+                            <section class="code-section code-section-grow">
+                                <div class="code-section-header code-viewer-header">
+                                    <span id="code-current-file-label">Archivo</span>
+                                    <div class="code-viewer-actions">
+                                        <button id="btn-use-file-context" class="btn-secondary btn-panel-action" title="Usar el archivo actual como contexto en el chat">Usar en chat</button>
+                                    </div>
+                                </div>
+                                <div id="code-outline" class="code-chip-row"></div>
+                                <pre id="code-file-content" class="code-file-content">Selecciona un archivo para ver su contenido.</pre>
+                            </section>
+                        </div>
+                    </div>
+
+                    <div id="code-view-scheduler" class="code-panel-view">
+                        <div class="code-toolbar">
+                            <button id="btn-refresh-scheduler" class="btn-secondary">Recargar jobs</button>
+                            <button id="btn-new-scheduler-job" class="btn-secondary">Nuevo job</button>
+                        </div>
+                        <div id="scheduler-status" class="setting-help-text code-status">Abre esta pestaña para gestionar tareas programadas.</div>
+
+                        <div class="code-panel-body">
+                            <section class="code-section">
+                                <div class="code-section-header">Resumen del scheduler</div>
+                                <div id="scheduler-summary" class="code-summary-grid"></div>
+                            </section>
+
+                            <section class="code-section">
+                                <div class="code-section-header">Estado 24/7</div>
+                                <div id="scheduler-current-state" class="code-summary-grid"></div>
+                            </section>
+
+                            <section class="code-section">
+                                <div class="code-section-header">Costos y presupuesto</div>
+                                <div id="cost-summary" class="code-summary-grid"></div>
+                            </section>
+
+                            <section class="code-section">
+                                <div class="code-section-header">Estado de presupuesto</div>
+                                <div id="cost-current-state" class="code-summary-grid"></div>
+                            </section>
+
+                            <section class="code-section">
+                                <div class="code-section-header">Reporte semanal de gasto</div>
+                                <div id="cost-weekly-summary" class="code-summary-grid"></div>
+                            </section>
+
+                            <section class="code-section code-section-grow">
+                                <div class="code-section-header">Breakdown semanal</div>
+                                <div id="cost-weekly-breakdown" class="code-list"></div>
+                            </section>
+
+                            <section class="code-section">
+                                <div class="code-section-header">Gateway y sesiones</div>
+                                <div id="gateway-summary" class="code-summary-grid"></div>
+                            </section>
+
+                            <section class="code-section code-section-grow">
+                                <div class="code-section-header">Outbox del gateway</div>
+                                <div id="gateway-outbox" class="code-list"></div>
+                            </section>
+
+                            <section class="code-section">
+                                <div class="code-section-header">Nodos conectados</div>
+                                <div id="nodes-summary" class="code-summary-grid"></div>
+                                <div id="nodes-list" class="code-list code-list-compact"></div>
+                                <div style="display:flex;gap:6px;margin-top:6px;">
+                                    <button id="btn-pair-node" class="btn-secondary btn-panel-action">Emparejar nodo</button>
+                                    <button id="btn-refresh-nodes" class="btn-secondary btn-panel-action">Actualizar</button>
+                                </div>
+                            </section>
+
+                            <section class="code-section">
+                                <div class="code-section-header">Smart Home</div>
+                                <div id="smart-home-summary" class="code-summary-grid"></div>
+                                <div id="smart-home-devices" class="code-list code-list-compact"></div>
+                                <button id="btn-refresh-smart-home" class="btn-secondary btn-panel-action" style="margin-top:6px;">Actualizar dispositivos</button>
+                            </section>
+
+                            <section class="code-section">
+                                <div class="code-section-header">Jobs programados</div>
+                                <div id="scheduler-job-list" class="code-list code-list-compact"></div>
+                            </section>
+
+                            <section class="code-section">
+                                <div class="code-section-header">Editor de job</div>
+                                <div class="scheduler-form-grid">
+                                    <input id="scheduler-job-name" class="setting-input" type="text" placeholder="Nombre del job">
+                                    <select id="scheduler-task-type" class="setting-select">
+                                        <option value="skill">skill</option>
+                                        <option value="mcp_tool">mcp_tool</option>
+                                    </select>
+                                    <select id="scheduler-trigger-type" class="setting-select">
+                                        <option value="interval">interval</option>
+                                        <option value="cron">cron</option>
+                                        <option value="heartbeat">heartbeat</option>
+                                        <option value="event">event</option>
+                                        <option value="webhook">webhook</option>
+                                    </select>
+                                    <label class="setting-toggle scheduler-inline-toggle">
+                                        <input type="checkbox" id="scheduler-enabled" checked>
+                                        <span>Enabled</span>
+                                    </label>
+                                    <input id="scheduler-interval-seconds" class="setting-input" type="number" min="5" step="1" placeholder="Intervalo (segundos)">
+                                    <input id="scheduler-cron-expression" class="setting-input" type="text" placeholder="Cron (ej: */5 * * * *)">
+                                    <input id="scheduler-event-name" class="setting-input" type="text" placeholder="Nombre del evento (ej: email.new)">
+                                    <input id="scheduler-webhook-path" class="setting-input" type="text" placeholder="Webhook path (ej: hooks/demo)">
+                                    <input id="scheduler-webhook-secret" class="setting-input" type="text" placeholder="Secret webhook (opcional)">
+                                    <input id="scheduler-heartbeat-key" class="setting-input" type="text" placeholder="Heartbeat key (ej: system)">
+                                    <input id="scheduler-heartbeat-interval-seconds" class="setting-input" type="number" min="1" step="1" placeholder="Min intervalo heartbeat (segundos)">
+                                    <input id="scheduler-max-retries" class="setting-input" type="number" min="0" step="1" placeholder="Max retries">
+                                    <input id="scheduler-retry-backoff-seconds" class="setting-input" type="number" min="1" step="1" placeholder="Backoff base (segundos)">
+                                    <input id="scheduler-retry-backoff-multiplier" class="setting-input" type="number" min="1" step="0.1" placeholder="Multiplicador backoff">
+                                </div>
+                                <textarea id="scheduler-payload" class="setting-textarea scheduler-payload-input" rows="10" placeholder='{"skill_id":"file-manager","tool":"inspect_text_file","input":{"path":"C:\\ruta\\archivo.txt"}}'></textarea>
+                                <div class="setting-actions">
+                                    <button id="btn-save-scheduler-job" class="btn-secondary">Guardar job</button>
+                                    <button id="btn-run-scheduler-job" class="btn-secondary">Ejecutar ahora</button>
+                                    <button id="btn-trigger-scheduler-job" class="btn-secondary">Disparar trigger</button>
+                                    <button id="btn-delete-scheduler-job" class="btn-secondary">Eliminar job</button>
+                                    <button id="btn-clear-scheduler-job" class="btn-secondary">Limpiar</button>
+                                </div>
+                                <div id="scheduler-form-meta" class="setting-help-text"></div>
+                            </section>
+
+                            <section class="code-section code-section-grow">
+                                <div class="code-section-header">Historial de ejecuciones</div>
+                                <div id="scheduler-runs" class="code-list"></div>
+                            </section>
+
+                            <section class="code-section code-section-grow">
+                                <div class="code-section-header">Checkpoints y logs</div>
+                                <div id="scheduler-checkpoints" class="code-list"></div>
+                            </section>
+
+                            <section class="code-section code-section-grow">
+                                <div class="code-section-header">Eventos recientes de costo</div>
+                                <div id="cost-events" class="code-list"></div>
+                            </section>
+                        </div>
+                    </div>
+
+                    <div id="code-view-canvas" class="code-panel-view">
+                        <div class="code-toolbar">
+                            <button id="btn-refresh-canvas" class="btn-secondary">Recargar</button>
+                            <button id="btn-new-canvas" class="btn-secondary">Nuevo canvas</button>
+                            <select id="select-canvas-type" class="setting-select" style="width:auto;min-width:100px;">
+                                <option value="">Todos</option>
+                                <option value="status">Estado</option>
+                                <option value="dashboard">Dashboard</option>
+                                <option value="monitor">Monitor</option>
+                                <option value="list">Lista</option>
+                                <option value="table">Tabla</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </div>
+                        <div id="canvas-status" class="setting-help-text code-status">Canvas activos del agente.</div>
+
+                        <div class="code-panel-body">
+                            <section class="code-section">
+                                <div class="code-section-header">Canvases</div>
+                                <div id="canvas-list" class="code-list code-list-compact"></div>
+                            </section>
+
+                            <section class="code-section code-section-grow">
+                                <div class="code-section-header canvas-viewer-header">
+                                    <span id="canvas-current-title">Selecciona un canvas</span>
+                                    <div class="canvas-viewer-actions" style="display:flex;gap:4px;">
+                                        <button id="btn-pin-canvas" class="btn-secondary btn-panel-action" title="Fijar canvas">📌</button>
+                                        <button id="btn-canvas-versions" class="btn-secondary btn-panel-action" title="Versiones">📋</button>
+                                        <button id="btn-delete-canvas" class="btn-secondary btn-panel-action" title="Eliminar">🗑</button>
+                                    </div>
+                                </div>
+                                <div id="canvas-render-area" class="canvas-render-area">
+                                    <div class="canvas-placeholder">Selecciona un canvas de la lista.</div>
+                                </div>
+                            </section>
+
+                            <section class="code-section">
+                                <div class="code-section-header">Historial de versiones</div>
+                                <div id="canvas-versions-list" class="code-list code-list-compact"></div>
+                            </section>
+                        </div>
+                    </div>
+
+                    <!-- ═══ Phase 10: Security Panel ═══ -->
+                    <div id="code-view-security" class="code-panel-view">
+                        <div class="code-toolbar">
+                            <button id="btn-refresh-security" class="btn-secondary">⟳ Actualizar</button>
+                        </div>
+                        <div class="code-panel-body">
+                            <!-- RBAC Users -->
+                            <section class="code-section">
+                                <div class="code-section-header">Roles y Usuarios (RBAC)</div>
+                                <div id="rbac-users-list" class="code-list"></div>
+                                <div style="margin-top:0.5rem;display:flex;gap:0.5rem">
+                                    <input id="rbac-new-user-id" class="setting-input" type="text" placeholder="user_id">
+                                    <input id="rbac-new-user-name" class="setting-input" type="text" placeholder="Nombre">
+                                    <select id="rbac-new-user-role" class="setting-select">
+                                        <option value="viewer">Viewer</option>
+                                        <option value="auditor">Auditor</option>
+                                        <option value="approver">Approver</option>
+                                        <option value="operator">Operator</option>
+                                        <option value="owner">Owner</option>
+                                    </select>
+                                    <button id="btn-add-rbac-user" class="btn-secondary">+ Agregar</button>
+                                </div>
+                            </section>
+
+                            <!-- Policies -->
+                            <section class="code-section">
+                                <div class="code-section-header">Políticas activas</div>
+                                <div id="rbac-policies-list" class="code-list code-list-compact"></div>
+                            </section>
+
+                            <!-- Ethical Restrictions -->
+                            <section class="code-section">
+                                <div class="code-section-header">Restricciones Éticas</div>
+                                <div id="ethical-restrictions-list" class="code-list code-list-compact"></div>
+                            </section>
+
+                            <!-- Audit Dashboard -->
+                            <section class="code-section">
+                                <div class="code-section-header">Auditoría (últimas 24h)</div>
+                                <div id="audit-stats-summary" class="code-summary-grid"></div>
+                                <div id="audit-recent-list" class="code-list code-list-compact" style="max-height:200px;overflow-y:auto"></div>
+                                <div style="margin-top:0.5rem;display:flex;gap:0.5rem">
+                                    <button id="btn-export-audit-json" class="btn-secondary">Exportar JSON</button>
+                                    <button id="btn-export-audit-csv" class="btn-secondary">Exportar CSV</button>
+                                </div>
+                            </section>
+
+                            <!-- Sandbox Status -->
+                            <section class="code-section">
+                                <div class="code-section-header">Sandbox</div>
+                                <div id="sandbox-status-info" class="setting-help-text"></div>
+                            </section>
+
+                            <!-- Rate Limits -->
+                            <section class="code-section">
+                                <div class="code-section-header">Rate Limits</div>
+                                <div id="rate-limits-info" class="code-summary-grid"></div>
+                            </section>
+                        </div>
+                    </div>
+
+                    <!-- Analytics & Goals Dashboard (Phase 13) -->
+                    <div id="code-view-analytics" class="code-panel-view">
+                        <div class="code-toolbar">
+                            <button id="btn-refresh-analytics" class="btn-secondary">⟳ Actualizar</button>
+                            <select id="analytics-period" class="setting-select" style="width:auto">
+                                <option value="24">Últimas 24h</option>
+                                <option value="168">Última semana</option>
+                                <option value="720">Último mes</option>
+                            </select>
+                        </div>
+                        <div class="code-panel-body">
+                            <!-- Executive Dashboard -->
+                            <section class="code-section">
+                                <div class="code-section-header">Dashboard Ejecutivo</div>
+                                <div id="analytics-dashboard-summary" class="code-summary-grid"></div>
+                            </section>
+
+                            <!-- Token Usage -->
+                            <section class="code-section">
+                                <div class="code-section-header">Uso de Tokens</div>
+                                <div id="analytics-tokens-summary" class="code-summary-grid"></div>
+                                <div id="analytics-tokens-by-provider" class="code-list code-list-compact"></div>
+                            </section>
+
+                            <!-- Time Distribution -->
+                            <section class="code-section">
+                                <div class="code-section-header">Distribución de Tiempo</div>
+                                <div id="analytics-time-distribution" class="code-list code-list-compact"></div>
+                            </section>
+
+                            <!-- Error History -->
+                            <section class="code-section">
+                                <div class="code-section-header">Errores Recientes</div>
+                                <div id="analytics-errors-list" class="code-list code-list-compact" style="max-height:200px;overflow-y:auto"></div>
+                            </section>
+
+                            <!-- Activity Timeline -->
+                            <section class="code-section">
+                                <div class="code-section-header">Actividad por Hora</div>
+                                <div id="analytics-timeline" class="code-list code-list-compact" style="max-height:160px;overflow-y:auto"></div>
+                            </section>
+
+                            <!-- Weekly Report -->
+                            <section class="code-section">
+                                <div class="code-section-header">Reporte Semanal</div>
+                                <button id="btn-weekly-report" class="btn-secondary">Generar Reporte</button>
+                                <div id="analytics-weekly-report" class="setting-help-text" style="margin-top:0.5rem"></div>
+                            </section>
+
+                            <!-- Goals -->
+                            <section class="code-section">
+                                <div class="code-section-header">Objetivos Activos</div>
+                                <div id="goals-list" class="code-list"></div>
+                                <div style="margin-top:0.5rem;display:flex;gap:0.5rem">
+                                    <input id="goal-new-title" class="setting-input" type="text" placeholder="Título del objetivo">
+                                    <input id="goal-new-deadline" class="setting-input" type="date" style="width:auto">
+                                    <button id="btn-add-goal" class="btn-secondary">+ Crear Objetivo</button>
+                                </div>
+                            </section>
+
+                            <!-- DAG Planner -->
+                            <section class="code-section">
+                                <div class="code-section-header">DAG Planner</div>
+                                <div id="dag-list" class="code-list code-list-compact"></div>
+                            </section>
+                        </div>
+                    </div>
+
+                </aside>
+            </div>
+        </div>
+    </div>
+
+    <div id="settings-panel" class="settings-panel hidden">
+        <div class="settings-header">
+            <h2>Configuracion</h2>
+            <button id="btn-close-settings" class="titlebar-btn" title="Cerrar">✕</button>
+        </div>
+        <div class="settings-layout">
+            <!-- ── Sidebar de categorías ── -->
+            <nav class="settings-nav">
+                <button class="settings-nav-item active" data-page="general">⚙ General</button>
+                <button class="settings-nav-item" data-page="model">🤖 Modelo IA</button>
+                <button class="settings-nav-item" data-page="voice">🎙️ Voz</button>
+                <button class="settings-nav-item" data-page="prompts">📝 Prompts</button>
+                <button class="settings-nav-item" data-page="security">🔒 Seguridad</button>
+                <button class="settings-nav-item" data-page="integrations">🔗 Integraciones</button>
+                <button class="settings-nav-item" data-page="scheduler">⏰ Scheduler</button>
+                <button class="settings-nav-item" data-page="crews">👥 Equipos</button>
+            </nav>
+
+            <!-- ── Contenido de cada página ── -->
+            <div class="settings-content">
+
+                <!-- ═══ GENERAL ═══ -->
+                <div class="settings-page active" data-page="general">
+                    <h3 class="settings-page-title">General</h3>
+
+                    <div class="setting-group">
+                        <label>Modo del Agente</label>
+                        <select id="select-mode" class="setting-select">
+                            <option value="normal">Cargando modos...</option>
+                        </select>
+                        <div id="mode-summary" class="setting-help-text"></div>
+                    </div>
+
+                    <div class="setting-group">
+                        <label>Nivel de Autonomia</label>
+                        <select id="select-autonomy-level" class="setting-select">
+                            <option value="libre">Libre: no pide aprobacion</option>
+                            <option value="supervisado">Supervisado: solo acciones sensibles</option>
+                            <option value="asistido">Asistido: apruebas cada accion</option>
+                        </select>
+                        <div id="autonomy-meta" class="setting-help-text"></div>
+                    </div>
+
+                    <div class="setting-group">
+                        <label>Ventana</label>
+                        <label class="setting-toggle">
+                            <input type="checkbox" id="cb-always-on-top" checked>
+                            <span>Siempre al frente</span>
+                        </label>
+                        <label class="setting-toggle">
+                            <input type="checkbox" id="cb-overlay">
+                            <span>Modo Overlay</span>
+                        </label>
+                    </div>
+
+                    <div class="setting-group">
+                        <label>Modo 24/7 y Bandeja</label>
+                        <label class="setting-toggle">
+                            <input type="checkbox" id="cb-app-start-with-windows">
+                            <span>Inicio con Windows</span>
+                        </label>
+                        <label class="setting-toggle">
+                            <input type="checkbox" id="cb-app-minimize-to-tray">
+                            <span>Minimizar a bandeja</span>
+                        </label>
+                        <label class="setting-toggle">
+                            <input type="checkbox" id="cb-app-close-to-tray">
+                            <span>Cerrar a bandeja en vez de salir</span>
+                        </label>
+                        <label class="setting-toggle">
+                            <input type="checkbox" id="cb-app-start-hidden-to-tray">
+                            <span>Iniciar oculto en bandeja</span>
+                        </label>
+                        <div id="app-behavior-meta" class="setting-help-text"></div>
+                        <div class="setting-actions">
+                            <button id="btn-save-app-behavior" class="btn-secondary">Guardar modo 24/7</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══ MODELO IA ═══ -->
+                <div class="settings-page" data-page="model">
+                    <h3 class="settings-page-title">Modelo IA</h3>
+
+                    <div class="setting-group">
+                        <label>Proveedor LLM</label>
+                        <select id="select-provider" class="setting-select">
+                            <option value="openai">OpenAI</option>
+                            <option value="anthropic">Anthropic</option>
+                            <option value="google">Google</option>
+                            <option value="xai">xAI (Grok)</option>
+                            <option value="deepseek">DeepSeek</option>
+                            <option value="ollama">Ollama (Local)</option>
+                            <option value="lmstudio">LM Studio (Local)</option>
+                        </select>
+                    </div>
+
+                    <div class="setting-group">
+                        <label>Modelo</label>
+                        <select id="select-model" class="setting-select">
+                            <option>Cargando modelos...</option>
+                        </select>
+                    </div>
+
+                    <div class="setting-group">
+                        <label>Temperatura: <span id="temp-value">0.7</span></label>
+                        <input type="range" id="input-temperature" class="setting-range" min="0" max="2" step="0.1" value="0.7">
+                    </div>
+
+                    <div class="setting-group">
+                        <label>API Keys</label>
+                        <div id="api-keys-container" class="api-keys-container"></div>
+                    </div>
+
+                    <!-- ═══ MODELOS GENERATIVOS ═══ -->
+                    <div class="setting-group" id="generative-media-group">
+                        <label>Generación Multimedia Avanzada (Google)</label>
+                        <div class="setting-help-text">Elige los modelos que el agente utilizará cuando deba generar imágenes, video o música.</div>
+                        
+                        <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
+                            <div>
+                                <label style="font-size: 12px; color: var(--text-secondary);">Imágenes (Nano/Imagen)</label>
+                                <select id="select-image-model" class="setting-select">
+                                    <option value="none">Desactivado</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size: 12px; color: var(--text-secondary);">Video (Veo)</label>
+                                <select id="select-video-model" class="setting-select">
+                                    <option value="none">Desactivado</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size: 12px; color: var(--text-secondary);">Música (Lyria)</label>
+                                <select id="select-music-model" class="setting-select">
+                                    <option value="none">Desactivado</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="setting-actions" style="margin-top: 10px;">
+                            <button id="btn-save-generative-models" class="btn-secondary">Guardar Generativos</button>
+                        </div>
+                    </div>
+
+                    <div class="setting-group">
+                        <label>Asignación de Modelos por Tipo de Tarea</label>
+                        <div class="setting-help-text">Elige qué proveedor y modelo usarán los sub-agentes para cada tipo de tarea. Si no se configura, se usa el modelo por defecto.</div>
+                        <div id="model-assignments-container" class="model-assignments-container"></div>
+                        <div id="model-assignments-meta" class="setting-help-text"></div>
+                        <div class="setting-actions">
+                            <button id="btn-save-model-assignments" class="btn-secondary">Guardar asignaciones</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══ VOZ ═══ -->
+                <div class="settings-page" data-page="voice">
+                    <h3 class="settings-page-title">Voz y Personaje</h3>
+
+                    <div class="setting-group">
+                        <label>Motor TTS</label>
+                        <select id="select-tts-engine" class="setting-select">
+                            <option value="melotts">MeloTTS (offline)</option>
+                            <option value="elevenlabs">ElevenLabs (online)</option>
+                            <option value="gemini-2.5-pro-tts">Gemini 2.5 Pro TTS (online)</option>
+                            <option value="gemini-2.5-flash-tts">Gemini 2.5 Flash TTS (online)</option>
+                            <option value="gemini-2.5-flash-lite-preview-tts">Gemini 2.5 Flash Lite TTS (online)</option>
+                            <option value="chirp_3">Chirp 3 (online)</option>
+                            <option value="chirp_2">Chirp 2 (online)</option>
+                            <option value="none">Desactivado</option>
+                        </select>
+                        <input id="input-elevenlabs-voice-id" class="setting-input" type="text" placeholder="Voice ID de ElevenLabs (opcional)">
+                    </div>
+
+                    <div class="setting-group">
+                        <label>Velocidad TTS: <span id="tts-speed-value">1.0</span></label>
+                        <input type="range" id="input-tts-speed" class="setting-range" min="0.5" max="2" step="0.1" value="1.0">
+                    </div>
+
+                    <div class="setting-group">
+                        <label>Personaje</label>
+                        <select id="select-character-type" class="setting-select">
+                            <option value="2d">Personaje 2D (sprites)</option>
+                            <option value="none">Sin personaje</option>
+                        </select>
+                    </div>
+
+                    <div class="setting-group">
+                        <label>Opciones</label>
+                        <label class="setting-toggle">
+                            <input type="checkbox" id="cb-auto-tts">
+                            <span>Sintetizar voz en cada respuesta</span>
+                        </label>
+                        <label class="setting-toggle">
+                            <input type="checkbox" id="cb-voice-enabled">
+                            <span>Activar motor de voz</span>
+                        </label>
+                        <div id="voice-character-meta" class="setting-help-text"></div>
+                        <div class="setting-actions">
+                            <button id="btn-save-voice" class="btn-secondary">Guardar voz y personaje</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══ PROMPTS ═══ -->
+                <div class="settings-page" data-page="prompts">
+                    <h3 class="settings-page-title">Prompts del Agente</h3>
+
+                    <div class="setting-group">
+                        <label>Prompt a editar</label>
+                        <select id="select-prompt-template" class="setting-select">
+                            <option value="">Cargando prompts...</option>
+                        </select>
+                        <textarea id="input-prompt-template" class="setting-textarea" rows="12" placeholder="Contenido del prompt..."></textarea>
+                        <div id="prompt-template-meta" class="setting-help-text"></div>
+                        <div class="setting-actions">
+                            <button id="btn-save-prompt-template" class="btn-secondary">Guardar prompt</button>
+                            <button id="btn-reset-prompt-template" class="btn-secondary">Restablecer default</button>
+                        </div>
+                    </div>
+
+                    <div class="setting-group">
+                        <label>Editor de Modo Personalizado</label>
+                        <input id="input-custom-mode-key" class="setting-input" type="text" placeholder="clave_del_modo">
+                        <input id="input-custom-mode-name" class="setting-input" type="text" placeholder="Nombre visible">
+                        <input id="input-custom-mode-icon" class="setting-input" type="text" placeholder="Icono o texto corto">
+                        <input id="input-custom-mode-description" class="setting-input" type="text" placeholder="Descripcion breve">
+                        <textarea id="input-custom-mode-behavior" class="setting-textarea" rows="6" placeholder="Prompt de comportamiento del modo..."></textarea>
+                        <textarea id="input-custom-mode-system" class="setting-textarea" rows="5" placeholder="System prompt especifico opcional para este modo..."></textarea>
+                        <input id="input-custom-mode-allowed" class="setting-input" type="text" placeholder="Capacidades permitidas, separadas por coma">
+                        <input id="input-custom-mode-restricted" class="setting-input" type="text" placeholder="Capacidades restringidas, separadas por coma">
+                        <label class="setting-toggle">
+                            <input type="checkbox" id="cb-custom-mode-scope">
+                            <span>Requiere confirmacion de scope</span>
+                        </label>
+                        <div id="custom-mode-meta" class="setting-help-text"></div>
+                        <div class="setting-actions">
+                            <button id="btn-save-custom-mode" class="btn-secondary">Guardar modo custom</button>
+                            <button id="btn-delete-custom-mode" class="btn-secondary">Borrar modo custom</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══ SEGURIDAD ═══ -->
+                <div class="settings-page" data-page="security">
+                    <h3 class="settings-page-title">Seguridad y Permisos</h3>
+
+                    <div class="setting-group">
+                        <label>Paginas Bloqueadas</label>
+                        <label class="setting-toggle">
+                            <input type="checkbox" id="cb-blocked-sites-enabled">
+                            <span>Activar paginas bloqueadas</span>
+                        </label>
+                        <textarea id="input-blocked-sites" class="setting-textarea" rows="6" placeholder="Un dominio por linea, por ejemplo: ejemplo.com"></textarea>
+                        <div id="blocked-sites-meta" class="setting-help-text"></div>
+                        <div class="setting-actions">
+                            <button id="btn-save-blocked-sites" class="btn-secondary">Guardar paginas bloqueadas</button>
+                        </div>
+                    </div>
+
+                    <div class="setting-group">
+                        <label>Aprobacion de Comandos (Terminal)</label>
+                        <label class="setting-toggle">
+                            <input type="checkbox" id="cb-exec-approvals-enabled">
+                            <span>Activar exec approvals para terminal</span>
+                        </label>
+                        <input id="input-exec-approvals-host" class="setting-input" type="text" placeholder="host actual (ej: pc-casa)">
+                        <textarea id="input-exec-allowed-commands" class="setting-textarea" rows="4" placeholder="Comandos exactos permitidos, uno por linea"></textarea>
+                        <textarea id="input-exec-allowed-patterns" class="setting-textarea" rows="4" placeholder="Patrones regex permitidos, uno por linea"></textarea>
+                        <textarea id="input-exec-denied-patterns" class="setting-textarea" rows="4" placeholder="Patrones regex denegados, uno por linea"></textarea>
+                        <div id="exec-approvals-meta" class="setting-help-text"></div>
+                        <div class="setting-actions">
+                            <button id="btn-save-exec-approvals" class="btn-secondary">Guardar exec approvals</button>
+                        </div>
+                    </div>
+
+                    <div class="setting-group">
+                        <label>Monitor de Costos y Presupuesto</label>
+                        <label class="setting-toggle">
+                            <input type="checkbox" id="cb-budget-enabled">
+                            <span>Activar monitor de costos y presupuesto</span>
+                        </label>
+                        <input id="input-budget-daily-limit" class="setting-input" type="number" min="0" step="any" placeholder="Límite diario (USD)">
+                        <input id="input-budget-monthly-limit" class="setting-input" type="number" min="0" step="any" placeholder="Límite mensual (USD)">
+                        <input id="input-budget-warning-threshold" class="setting-input" type="number" min="1" max="100" step="1" placeholder="Umbral de alerta (%)">
+                        <input id="input-budget-task-limit" class="setting-input" type="number" min="0" step="any" placeholder="Límite por tarea (USD)">
+                        <input id="input-budget-subagent-limit" class="setting-input" type="number" min="0" step="any" placeholder="Límite por subagente (USD)">
+                        <input id="input-budget-subagent-share" class="setting-input" type="number" min="0" max="1" step="0.05" placeholder="Share del presupuesto padre (0-1)">
+                        <textarea id="input-budget-mode-limits" class="setting-textarea json-textarea" rows="5" placeholder='{"programador": 0.75, "investigador": 0.6, "normal": 0.5}'></textarea>
+                        <div id="budget-meta" class="setting-help-text"></div>
+                        <div class="setting-actions">
+                            <button id="btn-save-budget" class="btn-secondary">Guardar presupuesto</button>
+                        </div>
+                    </div>
+
+                    <div class="setting-group">
+                        <label>Permisos de Gasto</label>
+                        <label class="setting-toggle">
+                            <input type="checkbox" id="cb-payments-enabled">
+                            <span>Permitir acciones con gasto o pago</span>
+                        </label>
+                        <select id="select-spend-permissions-mode" class="setting-select">
+                            <option value="deny_all">Bloquear todo</option>
+                            <option value="ask_always">Pedir aprobacion siempre</option>
+                            <option value="ask_above_x">Pedir aprobacion solo si supera X</option>
+                            <option value="auto_approve_under_x">Auto-aprobar hasta X</option>
+                        </select>
+                        <input id="input-spend-ask-above" class="setting-input" type="number" min="0" step="0.01" placeholder="Pedir aprobacion si supera (USD)">
+                        <input id="input-spend-auto-approve-under" class="setting-input" type="number" min="0" step="0.01" placeholder="Auto-aprobar hasta (USD)">
+                        <div id="payments-meta" class="setting-help-text"></div>
+                        <div class="setting-actions">
+                            <button id="btn-save-payments" class="btn-secondary">Guardar permisos de gasto</button>
+                        </div>
+                    </div>
+
+                    <div class="setting-group">
+                        <label>Cuentas de Pago</label>
+                        <input id="input-payments-default-account" class="setting-input" type="text" placeholder="Ej: tarjeta-bcp">
+                        <textarea id="input-payments-accounts" class="setting-textarea json-textarea" rows="6" placeholder='[{"id": "cuenta-1", "name": "Mi Tarjeta", "type": "credit_card", "enabled": true}]'></textarea>
+                        <div id="payments-accounts-meta" class="setting-help-text"></div>
+                        <div class="setting-actions">
+                            <button id="btn-save-payment-accounts" class="btn-secondary">Guardar cuentas y tarjetas</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══ INTEGRACIONES ═══ -->
+                <div class="settings-page" data-page="integrations">
+                    <h3 class="settings-page-title">Integraciones</h3>
+
+                    <div class="setting-group mcp-panel">
+                        <div class="mcp-header-row">
+                            <label>MCP Servers</label>
+                            <label class="setting-toggle">
+                                <input type="checkbox" id="cb-mcp-enabled">
+                                <span>Activar</span>
+                            </label>
+                        </div>
+
+                        <!-- Tabs -->
+                        <div class="mcp-tabs">
+                            <button class="mcp-tab active" data-mcp-tab="configure">Configurar</button>
+                            <button class="mcp-tab" data-mcp-tab="add-server">Agregar Servidor</button>
+                        </div>
+
+                        <!-- Tab: Configure (server list) -->
+                        <div class="mcp-tab-content active" data-mcp-tab="configure">
+                            <div id="mcp-servers-list" class="mcp-servers-list">
+                                <!-- Server cards rendered by JS -->
+                            </div>
+                            <div id="mcp-meta" class="setting-help-text"></div>
+                        </div>
+
+                        <!-- Tab: Add Server -->
+                        <div class="mcp-tab-content" data-mcp-tab="add-server">
+                            <div class="mcp-add-form">
+                                <label>Nombre del servidor</label>
+                                <input id="input-mcp-server-name" class="setting-input" type="text" placeholder="mi-servidor-mcp" required>
+
+                                <label>Tipo de transporte</label>
+                                <select id="select-mcp-transport" class="setting-select">
+                                    <option value="stdio">Local (stdio)</option>
+                                    <option value="http">Remoto (HTTP)</option>
+                                    <option value="sse">Remoto (SSE)</option>
+                                </select>
+
+                                <!-- Stdio fields -->
+                                <div id="mcp-fields-stdio" class="mcp-transport-fields">
+                                    <label>Comando</label>
+                                    <input id="input-mcp-command" class="setting-input" type="text" placeholder="python, node, npx, etc." required>
+                                    <label>Argumentos (separados por coma)</label>
+                                    <input id="input-mcp-args" class="setting-input" type="text" placeholder="server.py, --port, 3000">
+                                    <label>Directorio de trabajo (opcional)</label>
+                                    <input id="input-mcp-cwd" class="setting-input" type="text" placeholder="C:\ruta\al\servidor">
+                                </div>
+
+                                <!-- Remote fields -->
+                                <div id="mcp-fields-remote" class="mcp-transport-fields" style="display:none">
+                                    <label>URL del servidor</label>
+                                    <input id="input-mcp-url" class="setting-input" type="url" placeholder="https://example.com/mcp-server" required>
+                                </div>
+
+                                <label>Variables de entorno (JSON, opcional)</label>
+                                <textarea id="input-mcp-env" class="setting-textarea" rows="3" placeholder='{"API_KEY": "xxx", "PORT": "3001"}'></textarea>
+
+                                <div class="setting-actions">
+                                    <button id="btn-mcp-add-server" class="btn-primary-accent">Agregar Servidor</button>
+                                </div>
+                                <div id="mcp-add-meta" class="setting-help-text"></div>
+                            </div>
+                        </div>
+
+
+                    </div>
+
+                    <div class="setting-group">
+                        <label>Gateway Telegram</label>
+                        <label class="setting-toggle">
+                            <input type="checkbox" id="cb-gateway-telegram-enabled">
+                            <span>Activar Telegram en Gateway</span>
+                        </label>
+                        <input id="input-gateway-telegram-default-chat" class="setting-input" type="text" placeholder="default_chat_id de Telegram">
+                        <textarea id="input-gateway-telegram-allowed-chat-ids" class="setting-textarea" rows="4" placeholder="Un chat_id autorizado por linea"></textarea>
+                        <input id="input-gateway-telegram-token" class="setting-input" type="password" placeholder="Bot token de Telegram">
+                        <div id="gateway-telegram-meta" class="setting-help-text"></div>
+                        <div class="setting-actions">
+                            <button id="btn-save-gateway-telegram" class="btn-secondary">Guardar Telegram</button>
+                            <button id="btn-save-gateway-telegram-token" class="btn-secondary">Guardar token Telegram</button>
+                        </div>
+                    </div>
+
+                    <div class="setting-group">
+                        <label>Gateway WhatsApp</label>
+                        <label class="setting-toggle">
+                            <input type="checkbox" id="cb-gateway-whatsapp-enabled">
+                            <span>Activar WhatsApp Web en Gateway</span>
+                        </label>
+                        <input id="input-gateway-whatsapp-default-chat" class="setting-input" type="text" placeholder="default_chat_id de WhatsApp (ej. 573001234567@c.us)">
+                        <textarea id="input-gateway-whatsapp-allowed-chat-ids" class="setting-textarea" rows="4" placeholder="Un chat_id autorizado por linea"></textarea>
+                        <input id="input-gateway-whatsapp-session-name" class="setting-input" type="text" placeholder="Nombre de sesion del bridge (default)">
+                        <div id="gateway-whatsapp-meta" class="setting-help-text"></div>
+                        <div class="setting-help-text">Si el bridge entra en modo QR, escanéalo desde WhatsApp para autenticar la sesión.</div>
+                        <img id="gateway-whatsapp-qr" alt="QR de WhatsApp" style="display:none; max-width: 240px; margin-top: 8px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);" />
+                        <div class="setting-actions">
+                            <button id="btn-save-gateway-whatsapp" class="btn-secondary">Guardar WhatsApp</button>
+                        </div>
+                    </div>
+
+                    <div class="setting-group">
+                        <label>Gateway Discord</label>
+                        <label class="setting-toggle">
+                            <input type="checkbox" id="cb-gateway-discord-enabled">
+                            <span>Activar Discord en Gateway</span>
+                        </label>
+                        <input id="input-gateway-discord-default-channel" class="setting-input" type="text" placeholder="default_channel_id de Discord">
+                        <textarea id="input-gateway-discord-allowed-guild-ids" class="setting-textarea" rows="3" placeholder="Un guild_id autorizado por linea"></textarea>
+                        <textarea id="input-gateway-discord-allowed-channel-ids" class="setting-textarea" rows="4" placeholder="Un channel_id autorizado por linea"></textarea>
+                        <input id="input-gateway-discord-token" class="setting-input" type="password" placeholder="Bot token de Discord">
+                        <div id="gateway-discord-meta" class="setting-help-text"></div>
+                        <div class="setting-actions">
+                            <button id="btn-save-gateway-discord" class="btn-secondary">Guardar Discord</button>
+                            <button id="btn-save-gateway-discord-token" class="btn-secondary">Guardar token Discord</button>
+                        </div>
+                    </div>
+
+                    <div class="setting-group">
+                        <label>Skills Configurables</label>
+                        <label class="setting-toggle">
+                            <input type="checkbox" id="cb-skills-enabled">
+                            <span>Activar skills configurables</span>
+                        </label>
+                        <textarea id="input-skills-preferred" class="setting-textarea" rows="4" placeholder="Un skill preferido por linea"></textarea>
+                        <textarea id="input-skills-paths" class="setting-textarea" rows="4" placeholder="Una ruta de skill personalizada por linea"></textarea>
+                        <div id="skills-meta" class="setting-help-text"></div>
+                        <div class="setting-actions">
+                            <button id="btn-save-skills" class="btn-secondary">Guardar skills</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══ SCHEDULER ═══ -->
+                <div class="settings-page" data-page="scheduler">
+                    <h3 class="settings-page-title">Scheduler</h3>
+
+                    <div class="setting-group">
+                        <label>Scheduler Persistente</label>
+                        <label class="setting-toggle">
+                            <input type="checkbox" id="cb-scheduler-enabled">
+                            <span>Activar scheduler persistente</span>
+                        </label>
+                        <input id="input-scheduler-poll-interval" class="setting-input" type="number" min="0.5" step="0.5" placeholder="Intervalo de polling en segundos">
+                        <div id="scheduler-settings-meta" class="setting-help-text"></div>
+                        <div class="setting-actions">
+                            <button id="btn-save-scheduler-settings" class="btn-secondary">Guardar scheduler</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══ EQUIPOS (CREWS) ═══ -->
+                <div class="settings-page" data-page="crews">
+                    <h3 class="settings-page-title">Equipos Multi-Agente</h3>
+
+                    <div class="setting-group">
+                        <label>Equipos Configurados</label>
+                        <div class="setting-help-text">Los equipos permiten combinar múltiples sub-agentes con roles especializados para tareas complejas. Proceso secuencial: las tareas se ejecutan en orden. Jerárquico: un manager delega a los agentes.</div>
+                        <div id="crews-list" class="crews-list"></div>
+                        <div id="crews-meta" class="setting-help-text"></div>
+                    </div>
+
+                    <div class="setting-group">
+                        <label>Crear Equipo</label>
+                        <div class="crew-form">
+                            <label>Templates rápidos</label>
+                            <div class="setting-actions" style="margin-bottom: 8px;">
+                                <button class="btn-secondary crew-template-btn" data-template="dev-fullstack">🖥️ Dev Full-Stack</button>
+                                <button class="btn-secondary crew-template-btn" data-template="analisis">📊 Análisis</button>
+                                <button class="btn-secondary crew-template-btn" data-template="diseno">🎨 Diseño</button>
+                            </div>
+                            <input id="input-crew-name" class="setting-input" type="text" placeholder="Nombre del equipo" required>
+                            <select id="select-crew-process" class="setting-select">
+                                <option value="sequential">Secuencial</option>
+                                <option value="hierarchical">Jerárquico (con manager)</option>
+                            </select>
+                            <div id="crew-manager-section" style="display:none;">
+                                <label style="font-size:12px; color: var(--text-secondary);">Modelo del Manager</label>
+                                <input id="input-crew-manager-model" class="setting-input" type="text" placeholder="provider:model (ej: anthropic:claude-opus-4-6)">
+                            </div>
+
+                            <label style="font-size:12px; font-weight:600; color: var(--text-secondary); margin-top:8px;">Roles del equipo</label>
+                            <div id="crew-roles-container" class="crew-roles-container"></div>
+                            <button id="btn-crew-add-role" class="btn-secondary" style="margin-top:4px;">+ Agregar Rol</button>
+
+                            <div class="setting-actions" style="margin-top:8px;">
+                                <button id="btn-crew-save" class="btn-primary-accent">Guardar Equipo</button>
+                            </div>
+                            <div id="crew-form-meta" class="setting-help-text"></div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script src="../node_modules/socket.io-client/dist/socket.io.min.js"></script>
+    <script src="js/websocket.js"></script>
+    <script src="js/chat.js"></script>
+    <script src="js/code.js"></script>
+    <script src="js/history.js"></script>
+    <script src="js/overlay-effects.js"></script>
+    <script src="js/settings.js"></script>
+    <script src="js/voiceRealtime.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

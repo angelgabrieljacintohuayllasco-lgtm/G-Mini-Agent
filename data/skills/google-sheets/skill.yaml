@@ -1,0 +1,35 @@
+name: "google-sheets"
+version: "1.0.0"
+description: "Integración con Google Sheets. Permite leer, escribir, crear hojas y gestionar datos en spreadsheets."
+author: "G-Mini"
+category: "productividad"
+
+requires:
+  env:
+    - "GOOGLE_SHEETS_CREDENTIALS_JSON"
+
+tools:
+  - name: "gsheets_read"
+    description: "Lee datos de una hoja. Parámetros: 'spreadsheet_id' (str), 'range' (str, ej 'Sheet1!A1:D10'), 'value_render' (str, optional: 'FORMATTED_VALUE'|'UNFORMATTED_VALUE')."
+    script: "tools/gsheets_api.py"
+    timeout_seconds: 30
+
+  - name: "gsheets_write"
+    description: "Escribe datos en una hoja. Parámetros: 'spreadsheet_id' (str), 'range' (str), 'values' (list[list]), 'input_option' (str, default 'USER_ENTERED')."
+    script: "tools/gsheets_api.py"
+    timeout_seconds: 30
+
+  - name: "gsheets_append"
+    description: "Añade filas al final de una hoja. Parámetros: 'spreadsheet_id' (str), 'range' (str), 'values' (list[list])."
+    script: "tools/gsheets_api.py"
+    timeout_seconds: 30
+
+  - name: "gsheets_create"
+    description: "Crea un nuevo spreadsheet. Parámetros: 'title' (str)."
+    script: "tools/gsheets_api.py"
+    timeout_seconds: 30
+
+  - name: "gsheets_info"
+    description: "Obtiene metadatos de un spreadsheet. Parámetros: 'spreadsheet_id' (str)."
+    script: "tools/gsheets_api.py"
+    timeout_seconds: 30

@@ -1,0 +1,35 @@
+name: "google-calendar"
+version: "1.0.0"
+description: "Integración con Google Calendar. Permite listar, crear, actualizar y eliminar eventos del calendario."
+author: "G-Mini"
+category: "productividad"
+
+requires:
+  env:
+    - "GOOGLE_CALENDAR_CREDENTIALS_JSON"
+
+tools:
+  - name: "gcal_list_events"
+    description: "Lista eventos del calendario. Parámetros: 'calendar_id' (str, default 'primary'), 'max_results' (int, default 10), 'time_min' (str ISO, opcional), 'time_max' (str ISO, opcional)."
+    script: "tools/gcal_api.py"
+    timeout_seconds: 30
+
+  - name: "gcal_create_event"
+    description: "Crea un evento en el calendario. Parámetros: 'summary' (str), 'start' (str ISO), 'end' (str ISO), 'description' (str, opcional), 'location' (str, opcional), 'calendar_id' (str, default 'primary')."
+    script: "tools/gcal_api.py"
+    timeout_seconds: 30
+
+  - name: "gcal_update_event"
+    description: "Actualiza un evento existente. Parámetros: 'event_id' (str), 'summary' (str, opcional), 'start' (str ISO, opcional), 'end' (str ISO, opcional), 'description' (str, opcional), 'calendar_id' (str, default 'primary')."
+    script: "tools/gcal_api.py"
+    timeout_seconds: 30
+
+  - name: "gcal_delete_event"
+    description: "Elimina un evento. Parámetros: 'event_id' (str), 'calendar_id' (str, default 'primary')."
+    script: "tools/gcal_api.py"
+    timeout_seconds: 30
+
+  - name: "gcal_freebusy"
+    description: "Consulta disponibilidad. Parámetros: 'time_min' (str ISO), 'time_max' (str ISO), 'calendar_id' (str, default 'primary')."
+    script: "tools/gcal_api.py"
+    timeout_seconds: 30

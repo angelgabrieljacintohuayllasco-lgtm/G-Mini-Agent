@@ -1,0 +1,14 @@
+google:
+  default: gemini-3.1-flash-live-preview
+  models:
+  - gemini-2.5-flash-native-audio-preview-12-2025
+  - gemini-3.1-flash-live-preview
+openai:
+  default: gpt-realtime-1.5
+  models:
+  - gpt-realtime-1.5
+  - gpt-realtime-mini
+xai:
+  default: voice-agent
+  models:
+  - voice-agent

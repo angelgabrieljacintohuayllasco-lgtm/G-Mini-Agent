@@ -1,0 +1,22 @@
+name: "web-search"
+version: "1.0.0"
+description: "Búsqueda web con Tavily API o SearXNG local."
+author: "gmini-core"
+category: "productividad"
+
+requires:
+  permissions:
+    - "network.http"
+  env:
+    - "TAVILY_API_KEY"
+
+tools:
+  - name: "web_search"
+    description: "Busca en la web y devuelve resultados relevantes con snippets."
+    script: "tools/web_search.py"
+    timeout_seconds: 30
+
+  - name: "web_extract"
+    description: "Extrae el contenido principal de una URL específica."
+    script: "tools/web_search.py"
+    timeout_seconds: 30
