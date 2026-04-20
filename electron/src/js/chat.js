@@ -39,8 +39,9 @@ class ChatManager {
      */
     addScreenshot(base64Image, caption = '') {
         const now = Date.now();
-        // No throttle generated images, only regular screenshots
-        if (!caption && now - this._lastScreenshotTime < 3000) return;
+        // Throttle solo para screenshots idénticos consecutivos (evitar duplicados por refresh)
+        // No aplicar throttle a imágenes generadas ni screenshots del agente en voz
+        if (!caption && now - this._lastScreenshotTime < 500) return;
         if (!caption) this._lastScreenshotTime = now;
 
         const isGenerated = caption === 'generated_image';

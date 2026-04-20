@@ -21,6 +21,7 @@ sio = socketio.AsyncServer(
     cors_allowed_origins=["http://127.0.0.1:8765", "http://localhost:8765", "file://"],
     logger=False,
     engineio_logger=False,
+    max_http_buffer_size=10_000_000,
 )
 
 # Referencia al AgentCore (se inyecta en main.py)

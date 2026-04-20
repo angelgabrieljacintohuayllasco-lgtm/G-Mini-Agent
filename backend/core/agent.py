@@ -1958,6 +1958,54 @@ class AgentCore:
         self._base_system_prompt = _load_system_prompt()
         self._apply_system_prompt()
 
+    async def reload_voice_configuration(
+        self,
+        *,
+        reload_stt: bool = False,
+        origin: str = "unknown",
+    ) -> dict[str, Any]:
+        raw_tts_primary = config.get("voice", "tts_primary", default="melotts")
+        google_key_configured = bool(str(config.get_api_key("google_api") or "").strip())
+        elevenlabs_key_configured = bool(
+            str(config.get_api_key("elevenlabs_api") or "").strip()
+        )
+        logger.info(
+            "Voice reload requested in AgentCore: "
+            f"origin={origin}, "
+            f"reload_stt={reload_stt}, "
+            f"raw_voice_tts_primary={raw_tts_primary}, "
+            f"google_key_configured={google_key_configured}, "
+            f"elevenlabs_key_configured={elevenlabs_key_configured}"
+        )
+        if not self._voice:
+            runtime = {
+                "requested_engine": "none",
+                "active_engine": "none",
+                "available": False,
+                "reason": "not_available",
+                "message": "VoiceEngine no disponible.",
+                "warnings": [],
+                "supports_numeric_speed": False,
+            }
+            logger.warning(
+                "Voice reload skipped in AgentCore because VoiceEngine is not available: "
+                f"origin={origin}, runtime={runtime}"
+            )
+            return runtime
+
+        await self._voice.reload(reload_stt=reload_stt)
+        runtime = self._voice.get_tts_runtime_status()
+        logger.info(
+            "Voice configuration recargada: "
+            f"origin={origin}, "
+            f"requested_engine={runtime.get('requested_engine')}, "
+            f"active_engine={runtime.get('active_engine')}, "
+            f"available={runtime.get('available')}, "
+            f"reason={runtime.get('reason')}, "
+            f"message={runtime.get('message')}"
+        )
+        return runtime
+
     def get_modes(self) -> dict[str, Any]:
         mode = get_mode(self._current_mode)
         return {
@@ -2748,7 +2796,11 @@ class AgentCore:
                 if audio:
                     import base64
                     audio_b64 = base64.b64encode(audio).decode("utf-8")
-                    await sio.emit("agent:audio", {"audio": audio_b64, "format": "wav"}, to=sid)
+                    await sio.emit(
+                        "agent:audio",
+                        {"audio": audio_b64, "format": self._voice.tts_output_format},
+                        to=sid,
+                    )
 
                     lipsync = self._voice.generate_lipsync_data(audio)
                     if lipsync:
@@ -2761,30 +2813,14 @@ class AgentCore:
         self._cancel_event.set()
         self._paused = False
         self._pause_event.set()
-        if getattr(self, "_planner", None):
-            try:
-                await self._planner.stop_desktop_preview()
-            except Exception as exc:
-                logger.warning(f"No se pudo detener desktop preview al hacer stop: {exc}")
-            try:
-                await self._planner.stop_adb_preview()
-            except Exception as exc:
-                logger.warning(f"No se pudo detener Android preview al hacer stop: {exc}")
+        await self._stop_planner_previews(context="al hacer stop")
         logger.info("AgentCore: Stop solicitado")
         if self._active_sid:
             await self._set_agent_status(self._active_sid, AgentStatus.IDLE)
 
     async def shutdown(self) -> None:
         """Libera recursos de runtime durante el apagado del backend."""
-        if getattr(self, "_planner", None):
-            try:
-                await self._planner.stop_desktop_preview()
-            except Exception as exc:
-                logger.warning(f"No se pudo detener desktop preview durante shutdown: {exc}")
-            try:
-                await self._planner.stop_adb_preview()
-            except Exception as exc:
-                logger.warning(f"No se pudo detener Android preview durante shutdown: {exc}")
+        await self._stop_planner_previews(context="durante shutdown")
 
         if getattr(self, "_realtime_voice", None):
             try:
@@ -2805,6 +2841,25 @@ class AgentCore:
                 logger.warning(f"No se pudo cerrar vision engine durante shutdown: {exc}")
 
         logger.info("AgentCore: Shutdown completado")
+
+    async def _stop_planner_previews(self, *, context: str) -> None:
+        planner = getattr(self, "_planner", None)
+        if not planner:
+            return
+
+        preview_methods = (
+            ("stop_desktop_preview", "desktop preview"),
+            ("stop_adb_preview", "Android preview"),
+        )
+
+        for method_name, label in preview_methods:
+            stop_method = getattr(planner, method_name, None)
+            if not callable(stop_method):
+                continue
+            try:
+                await stop_method()
+            except Exception as exc:
+                logger.warning(f"No se pudo detener {label} {context}: {exc}")
 
     async def pause(self) -> None:
         """Pausa la generación."""
@@ -3039,6 +3094,9 @@ class AgentCore:
                 on_text=sim_on_text,
                 on_user_text=sim_on_user_text,
                 on_turn_complete=sim_on_turn_complete,
+                planner=self._planner,
+                sio=sio,
+                sid=sid,
             )
 
         # ── Modo nativo: WebSocket directo a proveedor RT ─

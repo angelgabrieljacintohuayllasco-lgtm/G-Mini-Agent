@@ -78,6 +78,7 @@ poetry.lock
 
 # IDEs y Editores
 .vscode/
+.github
 .idea/
 *.swp
 *.swo

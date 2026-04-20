@@ -4,7 +4,19 @@
  * Lanza el backend Python como proceso hijo automáticamente.
  */
 
-const { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain, screen } = require('electron');
+const electronModule = require('electron');
+if (!electronModule || typeof electronModule !== 'object' || !electronModule.app) {
+    const runAsNode = String(process.env.ELECTRON_RUN_AS_NODE || '').trim();
+    console.error(
+        '[App] No se pudo iniciar Electron porque el proceso se esta ejecutando en modo Node. '
+        + "require('electron') no expuso 'app'. "
+        + (runAsNode ? `ELECTRON_RUN_AS_NODE=${runAsNode}. ` : '')
+        + 'Abre un shell limpio o elimina esa variable antes de iniciar la app.'
+    );
+    process.exit(1);
+}
+
+const { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain, screen } = electronModule;
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
@@ -15,6 +27,7 @@ let overlayWindow = null;
 let tray = null;
 let isOverlayMode = false;
 let backendProcess = null;
+let backendProcessOwnership = 'none';
 let lastOverlayText = 'G-Mini Agent listo';
 
 const BACKEND_URL = 'http://127.0.0.1:8765';
@@ -30,6 +43,13 @@ const OVERLAY_BASE_SIZE = Object.freeze({ width: 400, height: 300 });
 const OVERLAY_MIN_SCALE = 0.7;
 const OVERLAY_MAX_SCALE = 2.25;
 const OVERLAY_SAVE_DEBOUNCE_MS = 180;
+const SINGLE_INSTANCE_LOCK = app.requestSingleInstanceLock();
+
+if (!SINGLE_INSTANCE_LOCK) {
+    console.error('[App] Ya hay una instancia activa de G-Mini Agent. Cerrando la nueva instancia.');
+    process.exit(0);
+}
+
 const DEFAULT_APP_PREFERENCES = Object.freeze({
     startWithWindows: false,
     minimizeToTray: true,
@@ -581,7 +601,35 @@ function setOverlayCharacterRuntime(payload = {}) {
     return overlayCharacterRuntime;
 }
 
-async function isBackendHealthy() {
+function focusPrimaryWindow() {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        if (mainWindow.isMinimized()) {
+            mainWindow.restore();
+        }
+        if (!mainWindow.isVisible()) {
+            mainWindow.show();
+        }
+        mainWindow.focus();
+        return;
+    }
+
+    if (!app.isReady()) return;
+
+    createMainWindow();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.show();
+        mainWindow.focus();
+    }
+}
+
+function isExpectedBackendHealthPayload(payload) {
+    return !!payload
+        && payload.status === 'ok'
+        && typeof payload.version === 'string'
+        && Number.isFinite(Number(payload.uptime_seconds));
+}
+
+async function getBackendHealthStatus() {
     let timeoutId = null;
     try {
         const controller = new AbortController();
@@ -591,9 +639,19 @@ async function isBackendHealthy() {
             cache: 'no-store',
             signal: controller.signal,
         });
-        return response.ok;
+
+        if (!response.ok) {
+            return { ok: false, statusCode: response.status };
+        }
+
+        const payload = await response.json();
+        if (!isExpectedBackendHealthPayload(payload)) {
+            return { ok: false, statusCode: response.status, payload };
+        }
+
+        return { ok: true, statusCode: response.status, payload };
     } catch (err) {
-        return false;
+        return { ok: false, error: err };
     } finally {
         if (timeoutId) clearTimeout(timeoutId);
     }
@@ -601,7 +659,19 @@ async function isBackendHealthy() {
 
 // ── Backend Process Management ───────────────────────────────
 
-function startBackend() {
+async function startBackend() {
+    if (backendProcess && backendProcessOwnership === 'owned') {
+        return true;
+    }
+
+    const existingBackend = await getBackendHealthStatus();
+    if (existingBackend.ok) {
+        backendProcess = null;
+        backendProcessOwnership = 'reused';
+        console.log(`[Backend] Reutilizando backend ya activo en ${BACKEND_URL}`);
+        return true;
+    }
+
     return new Promise((resolve) => {
         const venvPython = path.join(PROJECT_ROOT, 'venv', 'Scripts', 'python.exe');
         const fallbackPython = 'python';
@@ -611,11 +681,18 @@ function startBackend() {
 
         console.log(`[Backend] Iniciando con: ${pythonPath}`);
 
-        backendProcess = spawn(pythonPath, ['-m', 'backend.main'], {
+        const child = spawn(pythonPath, ['-m', 'backend.main'], {
             cwd: PROJECT_ROOT,
-            env: { ...process.env, PYTHONUNBUFFERED: '1' },
+            env: {
+                ...process.env,
+                PYTHONUNBUFFERED: '1',
+                PYTHONIOENCODING: 'utf-8',
+                PYTHONUTF8: '1',
+            },
             stdio: ['ignore', 'pipe', 'pipe'],
         });
+        backendProcess = child;
+        backendProcessOwnership = 'owned';
 
         let started = false;
         let settled = false;
@@ -632,11 +709,11 @@ function startBackend() {
         };
 
         const probeHealth = async () => {
-            if (settled || started || !backendProcess || healthCheckInFlight) return;
+            if (settled || started || backendProcess !== child || healthCheckInFlight) return;
             healthCheckInFlight = true;
             try {
-                const healthy = await isBackendHealthy();
-                if (healthy && !started) {
+                const health = await getBackendHealthStatus();
+                if (health.ok && !started) {
                     started = true;
                     finish(true);
                 }
@@ -645,23 +722,30 @@ function startBackend() {
             }
         };
 
-        backendProcess.stdout.on('data', (data) => {
-            const text = data.toString();
+        child.stdout.on('data', (data) => {
+            const text = data.toString('utf8');
             process.stdout.write(`[Backend] ${text}`);
         });
 
-        backendProcess.stderr.on('data', (data) => {
-            process.stderr.write(`[Backend] ${data.toString()}`);
+        child.stderr.on('data', (data) => {
+            process.stderr.write(`[Backend] ${data.toString('utf8')}`);
         });
 
-        backendProcess.on('error', (err) => {
+        child.on('error', (err) => {
             console.error(`[Backend] Error al iniciar: ${err.message}`);
+            if (backendProcess === child) {
+                backendProcess = null;
+                backendProcessOwnership = 'none';
+            }
             if (!started) finish(false);
         });
 
-        backendProcess.on('exit', (code) => {
-            console.log(`[Backend] Proceso termin? con c?digo: ${code}`);
-            backendProcess = null;
+        child.on('exit', (code) => {
+            console.log(`[Backend] Proceso termino con codigo: ${code}`);
+            if (backendProcess === child) {
+                backendProcess = null;
+                backendProcessOwnership = 'none';
+            }
             if (!started) finish(false);
         });
 
@@ -681,13 +765,21 @@ function startBackend() {
 }
 
 function stopBackend() {
-    if (backendProcess) {
+    if (backendProcessOwnership === 'reused') {
+        console.log('[Backend] Backend reutilizado; esta instancia no lo detiene.');
+        backendProcessOwnership = 'none';
+        return;
+    }
+
+    if (backendProcess && backendProcessOwnership === 'owned') {
+        const child = backendProcess;
         console.log('[Backend] Deteniendo...');
-        backendProcess.kill('SIGTERM');
+        backendProcessOwnership = 'none';
+        child.kill('SIGTERM');
         // Forzar kill si no termina en 3s
         setTimeout(() => {
-            if (backendProcess) {
-                backendProcess.kill('SIGKILL');
+            if (backendProcess === child) {
+                child.kill('SIGKILL');
                 backendProcess = null;
             }
         }, 3000);
@@ -1409,6 +1501,10 @@ ipcMain.handle('show-cursor-bubble', async (_, x, y) => {
 
 // ── App Lifecycle ────────────────────────────────────────────
 
+app.on('second-instance', () => {
+    focusPrimaryWindow();
+});
+
 app.whenReady().then(async () => {
     watchConfigFiles();
 
@@ -1473,8 +1569,5 @@ app.on('activate', () => {
     if (overlayWindow === null) {
         createOverlayWindow();
     }
-    if (mainWindow && !mainWindow.isVisible()) {
-        mainWindow.show();
-        mainWindow.focus();
-    }
+    focusPrimaryWindow();
 });

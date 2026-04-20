@@ -27,6 +27,13 @@ from backend.core.scheduler import get_scheduler
 from backend.core.skill_registry import SkillRegistry
 from backend.core.skill_runtime import SkillRuntime
 from backend.core.workspace_manager import WorkspaceManager
+from backend.voice.engine import (
+    DEFAULT_TTS_ENGINE,
+    get_tts_engine_descriptor,
+    list_tts_engines,
+    migrate_voice_config,
+    normalize_tts_engine,
+)
 from backend.api.schemas import (
     HealthResponse,
     ModelsResponse,
@@ -180,6 +187,84 @@ def _load_models_catalog() -> dict:
     return _models_catalog_cache
 
 
+def _build_voice_metadata() -> dict[str, Any]:
+    migrate_voice_config()
+
+    requested_engine, normalization_warning = normalize_tts_engine(
+        config.get("voice", "tts_primary", default=DEFAULT_TTS_ENGINE)
+    )
+    voice_id = str(config.get("voice", "elevenlabs_voice_id", default="") or "").strip()
+
+    from backend.api.websocket_handler import _agent_core
+
+    if _agent_core is not None and _agent_core.voice is not None:
+        runtime = _agent_core.voice.get_tts_runtime_status()
+    else:
+        requested_meta = get_tts_engine_descriptor(requested_engine)
+        runtime = {
+            "requested_engine": requested_engine,
+            "requested_label": requested_meta.get("label", requested_engine),
+            "active_engine": "none",
+            "active_label": get_tts_engine_descriptor("none").get("label", "Desactivado"),
+            "available": False,
+            "reason": "not_initialized",
+            "message": "VoiceEngine no inicializado.",
+            "warnings": [],
+            "supports_numeric_speed": bool(
+                requested_meta.get("supports_numeric_speed", False)
+            ),
+            "provider": requested_meta.get("provider", "unknown"),
+        }
+
+    if normalization_warning and normalization_warning not in runtime.get("warnings", []):
+        runtime["warnings"] = [*runtime.get("warnings", []), normalization_warning]
+
+    return {
+        "engines": list_tts_engines(),
+        "settings": {
+            "tts_primary": requested_engine,
+            "tts_speed": float(config.get("voice", "tts_speed", default=1.0)),
+            "auto_tts": bool(config.get("voice", "auto_tts", default=False)),
+            "enabled": bool(config.get("voice", "enabled", default=True)),
+            "elevenlabs_voice_id": voice_id,
+        },
+        "runtime": runtime,
+    }
+
+
+def _is_secret_voice_key(key: str) -> bool:
+    normalized = str(key or "").strip().lower()
+    return (
+        "api_key" in normalized
+        or "token" in normalized
+        or "secret" in normalized
+        or normalized in {"google_api", "elevenlabs_api"}
+    )
+
+
+def _mask_debug_value(key: str, value: Any) -> Any:
+    if not _is_secret_voice_key(key):
+        return value
+    raw = str(value or "")
+    return {
+        "redacted": True,
+        "length": len(raw),
+        "suffix": raw[-4:] if len(raw) > 4 else None,
+    }
+
+
+def _summarize_voice_runtime(runtime: dict[str, Any] | None) -> dict[str, Any]:
+    runtime = runtime or {}
+    return {
+        "requested_engine": runtime.get("requested_engine"),
+        "active_engine": runtime.get("active_engine"),
+        "available": runtime.get("available"),
+        "reason": runtime.get("reason"),
+        "message": runtime.get("message"),
+        "warnings": list(runtime.get("warnings") or []),
+    }
+
+
 @router.get("/models/catalog")
 async def get_models_catalog():
     """Devuelve el catálogo completo de modelos desde data/models.yaml."""
@@ -277,6 +362,12 @@ async def get_config_section(section: str):
     if data is None:
         raise HTTPException(status_code=404, detail=f"Sección '{section}' no encontrada")
     return ConfigResponse(success=True, data={section: data})
+
+
+@router.get("/voice/metadata")
+async def get_voice_metadata():
+    """Devuelve motores TTS soportados y el estado runtime de voz."""
+    return ConfigResponse(success=True, data=_build_voice_metadata())
 
 
 @router.get("/skills/catalog", response_model=SkillsCatalogResponse)
@@ -857,22 +948,123 @@ async def trigger_scheduler_webhook(
 
 @router.put("/config")
 async def update_config(req: ConfigUpdateRequest):
-    """Actualiza un valor de configuración."""
     try:
-        config.set(req.section, req.key, value=req.value)
         from backend.api.websocket_handler import _agent_core
+
+        target_key = req.key
+        target_value = req.value
+        response_data: dict[str, Any] = {}
+
+        if req.section == "voice":
+            if req.key == "tts_primary":
+                target_value, _warning = normalize_tts_engine(req.value)
+            elif req.key == "elevenlabs_default_voice":
+                target_key = "elevenlabs_voice_id"
+            elif req.key == "google_api_key":
+                logger.warning(
+                    "Voice config alias received via /config: req.key=voice.google_api_key. "
+                    "Redirecting to keyring vault 'google_api'."
+                )
+                config.set_api_key("google_api", str(req.value or "").strip())
+                persisted_voice_engine = config.get(
+                    "voice", "tts_primary", default=DEFAULT_TTS_ENGINE
+                )
+                logger.info(
+                    "Voice config alias applied: req.key=voice.google_api_key, "
+                    f"configured={bool(str(req.value or '').strip())}, "
+                    f"persisted_voice_tts_primary={persisted_voice_engine}"
+                )
+                if _agent_core is not None:
+                    logger.info(
+                        "Voice reload requested after voice.google_api_key alias save: "
+                        f"persisted_voice_tts_primary={persisted_voice_engine}"
+                    )
+                    response_data["voice_runtime"] = await _agent_core.reload_voice_configuration(
+                        reload_stt=False,
+                        origin="config:voice.google_api_key",
+                    )
+                    logger.info(
+                        "Voice reload completed after voice.google_api_key alias save: "
+                        f"{_summarize_voice_runtime(response_data['voice_runtime'])}"
+                    )
+                return ConfigResponse(success=True, data=response_data or None)
+
+            logger.info(
+                "Voice config update requested: "
+                f"req.key={req.key}, "
+                f"req.value={_mask_debug_value(req.key, req.value)}, "
+                f"target_key={target_key}, "
+                f"target_value={_mask_debug_value(target_key, target_value)}"
+            )
+
+        config.set(req.section, target_key, value=target_value)
+
+        if req.section == "voice":
+            persisted_voice_engine = config.get("voice", "tts_primary", default=DEFAULT_TTS_ENGINE)
+            logger.info(
+                "Voice config persisted: "
+                f"req.key={req.key}, "
+                f"req.value={_mask_debug_value(req.key, req.value)}, "
+                f"target_key={target_key}, "
+                f"target_value={_mask_debug_value(target_key, target_value)}, "
+                f"persisted_voice_tts_primary={persisted_voice_engine}"
+            )
+
         if _agent_core is not None and req.section == "agent" and req.key == "system_prompt_file":
             _agent_core.reload_prompt_configuration()
+
+        # Solo recargar el motor de voz cuando el cambio afecta al engine activo.
+        # Claves que NO requieren reload: tts_speed, auto_tts, enabled, elevenlabs_voice_id, google_voice.
+        _VOICE_KEYS_REQUIRING_RELOAD = {"tts_primary"}
+        voice_needs_reload = (
+            _agent_core is not None
+            and req.section == "voice"
+            and (target_key in _VOICE_KEYS_REQUIRING_RELOAD or str(target_key).startswith("stt_"))
+        )
+        if voice_needs_reload:
+            reload_stt = str(target_key).startswith("stt_")
+            logger.info(
+                "Voice reload requested from /config: "
+                f"origin=config:{req.section}.{target_key}, "
+                f"reload_stt={reload_stt}, "
+                f"persisted_voice_tts_primary={config.get('voice', 'tts_primary', default=DEFAULT_TTS_ENGINE)}"
+            )
+            response_data["voice_runtime"] = await _agent_core.reload_voice_configuration(
+                reload_stt=reload_stt,
+                origin=f"config:{req.section}.{target_key}",
+            )
+            logger.info(
+                "Voice reload completed from /config: "
+                f"origin=config:{req.section}.{target_key}, "
+                f"runtime={_summarize_voice_runtime(response_data['voice_runtime'])}"
+            )
+
+            # Informar si el motor solicitado no pudo activarse
+            if req.key == "tts_primary" and response_data.get("voice_runtime", {}).get("available") is False:
+                reason = response_data["voice_runtime"].get("reason", "")
+                message = response_data["voice_runtime"].get("message", "")
+                if reason == "missing_key":
+                    response_data["warning"] = (
+                        f"No está configurada la API key necesaria para '{target_value}'. "
+                        "Guarda la API key correspondiente para activar este motor."
+                    )
+                elif reason in ("init_error", "unsupported_model"):
+                    response_data["warning"] = (
+                        f"No se pudo inicializar el motor '{target_value}': {message}"
+                    )
+
         if req.section == "scheduler":
             scheduler = _get_scheduler_service()
             await scheduler.reload_config()
+
         if req.section == "gateway":
             gateway = _get_gateway_service()
             await gateway.reload_config()
-        return ConfigResponse(success=True)
+
+        return ConfigResponse(success=True, data=response_data or None)
+
     except Exception as e:
         return ConfigResponse(success=False, error=str(e))
-
 
 @router.get("/prompts")
 async def get_prompts():
@@ -938,6 +1130,13 @@ async def set_api_key(req: APIKeySetRequest):
         raise HTTPException(status_code=400, detail=f"Provider '{req.provider}' no reconocido")
 
     config.set_api_key(vault, req.api_key)
+    logger.info(
+        "API key saved: "
+        f"provider={req.provider}, "
+        f"vault={vault}, "
+        f"configured={bool(str(req.api_key or '').strip())}, "
+        f"voice_tts_primary_before_reload={config.get('voice', 'tts_primary', default=DEFAULT_TTS_ENGINE)}"
+    )
 
     # Reinicializar el provider con la nueva key
     try:
@@ -946,6 +1145,21 @@ async def set_api_key(req: APIKeySetRequest):
             provider_obj = _agent_core._router.get_provider(req.provider)
             if provider_obj and hasattr(provider_obj, '_configure'):
                 provider_obj._configure()
+        if _agent_core and req.provider in {"google", "elevenlabs"}:
+            logger.info(
+                "Voice reload requested after API key save: "
+                f"provider={req.provider}, "
+                f"voice_tts_primary_before_reload={config.get('voice', 'tts_primary', default=DEFAULT_TTS_ENGINE)}"
+            )
+            runtime = await _agent_core.reload_voice_configuration(
+                reload_stt=False,
+                origin=f"api-key:{req.provider}",
+            )
+            logger.info(
+                "Voice reload completed after API key save: "
+                f"provider={req.provider}, "
+                f"runtime={_summarize_voice_runtime(runtime)}"
+            )
     except Exception:
         pass  # Non-blocking: el provider se reconfigurará en el siguiente uso
 

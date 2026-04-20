@@ -66,6 +66,9 @@ class SimulatedRealtimeVoice:
         self._model_router: Any = None
         self._memory: Any = None
         self._system_prompt: str = ""
+        self._planner: Any = None   # ActionPlanner para ejecutar [ACTION:...]
+        self._sio: Any = None       # Socket.IO server para emitir eventos al frontend
+        self._sid: str = ""         # Session ID del cliente conectado
 
         # Task de procesamiento en background
         self._process_task: asyncio.Task | None = None
@@ -83,6 +86,9 @@ class SimulatedRealtimeVoice:
         on_text: Callable[[str], Coroutine] | None = None,
         on_user_text: Callable[[str], Coroutine] | None = None,
         on_turn_complete: Callable[[], Coroutine] | None = None,
+        planner: Any = None,
+        sio: Any = None,
+        sid: str = "",
     ) -> bool:
         """Inicia la sesión simulada de realtime voice."""
         if not voice_engine or not voice_engine.stt_available:
@@ -103,6 +109,9 @@ class SimulatedRealtimeVoice:
         self._on_text = on_text
         self._on_user_text = on_user_text
         self._on_turn_complete = on_turn_complete
+        self._planner = planner
+        self._sio = sio
+        self._sid = sid
 
         self._active = True
         self._processing = False
@@ -116,7 +125,8 @@ class SimulatedRealtimeVoice:
 
         logger.info(
             f"SimulatedRT: sesión iniciada "
-            f"(STT: {voice_engine.stt_available}, TTS: {voice_engine.tts_engine_name})"
+            f"(STT: {voice_engine.stt_available}, TTS: {voice_engine.tts_engine_name}, "
+            f"planner={'OK' if planner else 'NO'})"
         )
         return True
 
@@ -220,7 +230,8 @@ class SimulatedRealtimeVoice:
 
             # ── 2. LLM: texto → respuesta streaming ──────
             messages = self._build_messages(user_text)
-            full_response = ""
+            raw_response = ""
+            visible_response = ""
             sentence_buffer = ""
 
             async for text_chunk in self._model_router.generate(
@@ -234,12 +245,22 @@ class SimulatedRealtimeVoice:
                 if not self._active:
                     return  # Sesión detenida durante generación
 
-                full_response += text_chunk
+                raw_response += text_chunk
                 sentence_buffer += text_chunk
 
-                # Emitir texto progresivo al frontend
-                if self._on_text:
-                    await self._on_text(text_chunk)
+                # Emitir texto progresivo al frontend ocultando bloques [ACTION:...]
+                next_visible_response = self._strip_action_blocks(raw_response)
+                if not next_visible_response.startswith(visible_response):
+                    logger.warning(
+                        "SimulatedRT: delta visible no monotónica; se reenviará texto limpio completo "
+                        f"(prev_len={len(visible_response)}, next_len={len(next_visible_response)})"
+                    )
+                    visible_response = ""
+                visible_delta = next_visible_response[len(visible_response):]
+                visible_response = next_visible_response
+
+                if visible_delta and self._on_text:
+                    await self._on_text(visible_delta)
 
                 # Buscar oraciones completas para sintetizar progresivamente
                 sentences, remainder = self._extract_complete_sentences(sentence_buffer)
@@ -253,12 +274,21 @@ class SimulatedRealtimeVoice:
                 await self._synthesize_and_emit(sentence_buffer.strip())
 
             # Persistir respuesta del agente
-            if full_response.strip() and self._memory:
+            clean_response = self._strip_action_blocks(raw_response).strip()
+            if raw_response != clean_response:
+                logger.debug(
+                    "SimulatedRT: bloques ACTION removidos de la respuesta visible "
+                    f"(raw_len={len(raw_response)}, clean_len={len(clean_response)})"
+                )
+            if clean_response and self._memory:
                 try:
-                    self._memory.add_assistant_message(full_response.strip())
-                    await self._memory.persist_message("assistant", full_response.strip())
+                    self._memory.add_assistant_message(clean_response)
+                    await self._memory.persist_message("assistant", clean_response)
                 except Exception as exc:
                     logger.warning(f"SimulatedRT: no se pudo persistir respuesta agente: {exc}")
+
+            # ── 3. Ejecutar acciones [ACTION:...] del LLM ──
+            await self._execute_llm_actions(raw_response)
 
             # Señalar fin de turno
             if self._on_turn_complete:
@@ -281,6 +311,228 @@ class SimulatedRealtimeVoice:
                     pass
         finally:
             self._processing = False
+
+    async def _execute_llm_actions(self, full_response: str) -> None:
+        """Parsea y ejecuta acciones [ACTION:...] de la respuesta del LLM.
+        Emite eventos al frontend. Si hay imagen (screenshot), hace segundo turno LLM
+        con la imagen para que el modelo pueda describirla antes de volver a escuchar."""
+        if not self._planner or not self._sio or not self._sid:
+            if "[ACTION:" in full_response:
+                logger.warning(
+                    "SimulatedRT: respuesta contiene [ACTION:...] pero planner/sio/sid no disponibles"
+                )
+            return
+
+        try:
+            actions = self._planner.parse_actions(full_response)
+        except Exception as exc:
+            logger.error(f"SimulatedRT: error parseando acciones: {exc}")
+            return
+
+        if not actions:
+            return
+
+        logger.info(f"SimulatedRT: ejecutando {len(actions)} acción(es) del LLM")
+
+        from backend.core.planner import set_planner_socket
+        from backend.api.websocket_handler import emit_message, emit_screenshot
+
+        set_planner_socket(self._sio, self._sid)
+
+        try:
+            await self._sio.emit("agent:executing", {"active": True}, to=self._sid)
+            results = await self._planner.execute_actions(actions)
+        except Exception as exc:
+            logger.error(f"SimulatedRT: error ejecutando acciones: {exc}", exc_info=True)
+            results = []
+        finally:
+            await self._sio.emit("agent:executing", {"active": False}, to=self._sid)
+
+        # Recopilar imágenes de acciones visuales para segundo turno LLM
+        captured_images: list[str] = []
+
+        for result in results or []:
+            action_name = str(result.get("action", ""))
+            success = result.get("success", False)
+            data = result.get("data") or {}
+            message = str(result.get("message", "")).strip()
+
+            # Screenshot: emitir al chat Y guardar imagen para LLM
+            if (
+                action_name in {"screenshot", "browser_screenshot", "adb_screenshot"}
+                and success
+                and isinstance(data, dict)
+            ):
+                raw_b64 = str(data.get("image_base64") or "").strip()
+                # Limpiar prefijo data: si viene incluido (evitar doble prefijo)
+                if raw_b64.startswith("data:") and "," in raw_b64:
+                    raw_b64 = raw_b64.split(",", 1)[1]
+                if raw_b64 and len(raw_b64) > 100:
+                    captured_images.append(raw_b64)
+                    dims = data.get("screen_dimensions") or {}
+                    dims_text = ""
+                    if isinstance(dims, dict) and dims.get("sent_w") and dims.get("sent_h"):
+                        dims_text = f" sent={dims.get('sent_w')}x{dims.get('sent_h')}"
+                    try:
+                        await emit_screenshot(self._sid, raw_b64)
+                        logger.info(
+                            "SimulatedRT: screenshot emitido al frontend "
+                            f"(action={action_name}, b64_chars={len(raw_b64)}{dims_text})"
+                        )
+                    except Exception as exc:
+                        logger.error(f"SimulatedRT: error emitiendo screenshot: {exc}")
+
+            # Emitir resultado como mensaje de actividad
+            if message:
+                status_icon = "✅" if success else "❌"
+                try:
+                    await emit_message(
+                        self._sid,
+                        f"{status_icon} **{action_name}**: {message}",
+                        "action",
+                        done=True,
+                    )
+                except Exception as exc:
+                    logger.debug(f"SimulatedRT: no se pudo emitir resultado: {exc}")
+
+        # ── Segundo turno LLM si hay imágenes capturadas ──────────────────
+        # El modelo recibe la imagen y genera descripción/análisis → TTS
+        # STT permanece bloqueado (self._processing=True) durante todo este bloque
+        if captured_images and self._model_router:
+            analysis_images = captured_images[-1:]
+            if len(captured_images) > 1:
+                logger.info(
+                    "SimulatedRT: multiples screenshots en un turno; se usara la ultima imagen "
+                    f"para el analisis visual (capturadas={len(captured_images)})"
+                )
+            provider_name = self._model_router.get_current_provider_name()
+            model_name = self._model_router.get_current_model()
+            logger.info(
+                "SimulatedRT: segundo turno visual preparado "
+                f"(provider={provider_name}, model={model_name}, images={len(analysis_images)}, "
+                f"b64_chars={[len(img) for img in analysis_images]})"
+            )
+            logger.info("SimulatedRT: segundo turno LLM con imagen para análisis visual")
+            try:
+                # Construir mensaje de feedback incluyendo la imagen
+                # La version efectiva del prompt se redefine abajo para asegurar
+                # que la imagen viaje como contexto visual real y no quede ambigua.
+                vision_prompt = (
+                    "Sistema: Acción 'screenshot' completada. Aquí está la imagen capturada. "
+                    "Continúa respondiendo al usuario basándote en esta imagen según lo que te pidió."
+                )
+                vision_prompt = (
+                    "Analiza la captura de pantalla adjunta y responde al ultimo pedido del usuario "
+                    "basandote solo en esta imagen. Describe la app, sitio o ventana principal, "
+                    "el contenido visible mas importante y cualquier texto claramente legible que sea relevante. "
+                    "Si algo no se distingue con certeza, dilo explicitamente. "
+                    "Responde en 1 a 3 frases completas y no dejes la ultima frase inconclusa."
+                )
+                vision_msg = LLMMessage(
+                    role="user",
+                    content=vision_prompt,
+                    images=analysis_images,
+                )
+                # No persistir este prompt auxiliar como mensaje de usuario:
+                # solo sirve para el segundo turno visual actual.
+
+                # Construir historial de mensajes + imagen
+                vision_messages = self._build_messages_base() + [vision_msg]
+
+                vision_response = ""
+                vision_sentence_buffer = ""
+                vision_chunk_count = 0
+
+                async for chunk in self._model_router.generate(
+                    messages=vision_messages,
+                    model=model_name,
+                    provider_name=provider_name,
+                    temperature=0.7,
+                    max_tokens=512,
+                    stream=True,
+                ):
+                    if not self._active:
+                        break
+                    vision_chunk_count += 1
+                    vision_response += chunk
+                    vision_sentence_buffer += chunk
+
+                    if self._on_text:
+                        await self._on_text(chunk)
+
+                    sentences, vision_sentence_buffer = self._extract_complete_sentences(vision_sentence_buffer)
+                    for sentence in sentences:
+                        await self._synthesize_and_emit(sentence)
+
+                if self._looks_incomplete_response(vision_response):
+                    logger.warning(
+                        "SimulatedRT: la respuesta visual parece incompleta; solicitando cierre "
+                        f"(chars={len(vision_response.strip())}, tail={vision_response.strip()[-120:]!r})"
+                    )
+                    repair_prompt = (
+                        "Tu respuesta anterior quedo incompleta. Completala ahora usando la misma captura. "
+                        "No repitas todo; termina la idea en 1 o 2 frases completas."
+                    )
+                    repair_msg = LLMMessage(
+                        role="user",
+                        content=repair_prompt,
+                        images=analysis_images,
+                    )
+                    async for chunk in self._model_router.generate(
+                        messages=vision_messages + [LLMMessage(role="assistant", content=vision_response)] + [repair_msg],
+                        model=model_name,
+                        provider_name=provider_name,
+                        temperature=0.4,
+                        max_tokens=160,
+                        stream=True,
+                    ):
+                        if not self._active:
+                            break
+                        vision_chunk_count += 1
+                        vision_response += chunk
+                        vision_sentence_buffer += chunk
+
+                        if self._on_text:
+                            await self._on_text(chunk)
+
+                        sentences, vision_sentence_buffer = self._extract_complete_sentences(vision_sentence_buffer)
+                        for sentence in sentences:
+                            await self._synthesize_and_emit(sentence)
+
+                if vision_sentence_buffer.strip():
+                    await self._synthesize_and_emit(vision_sentence_buffer.strip())
+
+                if vision_response.strip() and self._memory:
+                    try:
+                        self._memory.add_assistant_message(vision_response.strip())
+                        await self._memory.persist_message("assistant", vision_response.strip())
+                    except Exception:
+                        pass
+
+                logger.info("SimulatedRT: análisis visual completado")
+
+                logger.info(
+                    "SimulatedRT: analisis visual completado "
+                    f"(chunks={vision_chunk_count}, chars={len(vision_response.strip())}, "
+                    f"tail={vision_response.strip()[-120:]!r})"
+                )
+            except Exception as exc:
+                logger.error(f"SimulatedRT: error en segundo turno LLM con imagen: {exc}", exc_info=True)
+            return  # ya hicimos feedback visual, no persistir texto genérico
+
+        # Feedback de acciones no-visuales a memoria
+        if results:
+            feedback_lines = []
+            for r in results:
+                status = "OK" if r.get("success") else "ERROR"
+                feedback_lines.append(f"[{status}] {r.get('action', '?')}: {str(r.get('message', ''))[:120]}")
+            feedback_text = "Resultado de acciones:\n" + "\n".join(feedback_lines)
+            if self._memory:
+                try:
+                    self._memory.add_user_message(feedback_text)
+                    await self._memory.persist_message("user", feedback_text)
+                except Exception as exc:
+                    logger.debug(f"SimulatedRT: no se pudo persistir feedback: {exc}")
 
     async def _synthesize_and_emit(self, text: str) -> None:
         """Sintetiza una oración con TTS y emite los chunks de audio al frontend."""
@@ -313,8 +565,10 @@ class SimulatedRealtimeVoice:
                 chunk = pcm16_24k[offset:end]
                 await self._on_audio(chunk)
                 offset = end
-                # Pequeña pausa para no saturar el frontend
-                await asyncio.sleep(0.01)
+                # Pausa real de 100ms para sincronizar el envío con la reproducción.
+                # Esto mantiene _processing=True mientras el agente "habla", evitando 
+                # que el STT escuche ecos del TTS (barge-in simple).
+                await asyncio.sleep(0.1)
 
         except Exception as exc:
             logger.error(f"SimulatedRT TTS error: {exc}")
@@ -323,22 +577,31 @@ class SimulatedRealtimeVoice:
 
     @staticmethod
     def _strip_action_blocks(text: str) -> str:
-        """Elimina bloques [ACTION:...] del texto para que TTS no los lea."""
+        """Elimina bloques [ACTION:...] y variantes del texto para que TTS no los lea."""
         import re
-        return re.sub(r'\[ACTION:[^\]]*\]', '', text).strip()
+        # Formato estándar: [ACTION:tipo(params)]
+        cleaned = re.sub(r'\[ACTION:[^\]]*\]', '', text)
+        # Remover bloques incompletos al final si el LLM se cortó
+        cleaned = re.sub(r'\[ACTION:[^\]]*$', '', cleaned)
+        # Variante sin corchetes que algunos modelos generan: ACTION:\nscreenshot o ACTION: screenshot
+        cleaned = re.sub(r'\bACTION\s*:\s*\w+', '', cleaned, flags=re.IGNORECASE)
+        return cleaned.strip()
 
-    def _build_messages(self, user_text: str) -> list[LLMMessage]:
-        """Construye el array de mensajes para el LLM."""
+    def _build_messages_base(self) -> list[LLMMessage]:
+        """Construye historial de mensajes sin agregar nuevo mensaje user al final."""
         messages = [LLMMessage(role="system", content=self._system_prompt)]
-
-        # Incluir últimos mensajes de contexto
         if self._memory and hasattr(self._memory, "messages"):
-            recent = self._memory.messages[-20:]  # Últimos 20 mensajes
+            recent = self._memory.messages[-20:]
             for msg in recent:
                 role = msg.get("role", "user") if isinstance(msg, dict) else getattr(msg, "role", "user")
                 content = msg.get("content", "") if isinstance(msg, dict) else getattr(msg, "content", "")
                 if role in ("user", "assistant") and content:
                     messages.append(LLMMessage(role=role, content=content))
+        return messages
+
+    def _build_messages(self, user_text: str) -> list[LLMMessage]:
+        """Construye el array de mensajes para el LLM."""
+        messages = self._build_messages_base()
 
         # El mensaje actual del usuario (ya debe estar en la memoria,
         # pero lo agregamos explícitamente si no está)
@@ -354,7 +617,8 @@ class SimulatedRealtimeVoice:
         Retorna (oraciones_completas, texto_restante).
         """
         # Delimitadores de oración para TTS progresivo
-        delimiters = ".!?;:\n"
+        # Nota: ':' eliminado para no partir bloques [ACTION:...] a la mitad
+        delimiters = ".!?;\n"
         sentences = []
         last_split = 0
 
@@ -367,6 +631,31 @@ class SimulatedRealtimeVoice:
 
         remainder = text[last_split:]
         return sentences, remainder
+
+    @staticmethod
+    def _looks_incomplete_response(text: str) -> bool:
+        """Heuristica simple para detectar respuestas visuales cortadas."""
+        normalized = str(text or "").strip()
+        if not normalized:
+            return False
+
+        if normalized.endswith(("...", "…")):
+            return True
+
+        if normalized.count("**") % 2 != 0:
+            return True
+
+        if normalized[-1] in ".!?)]}\"'":
+            return False
+
+        unfinished_tokens = {
+            "a", "al", "ante", "bajo", "con", "contra", "de", "del", "desde",
+            "durante", "en", "entre", "hacia", "hasta", "para", "por", "segun",
+            "sin", "sobre", "tras", "y", "o", "que", "como", "cuando", "donde",
+            "el", "la", "los", "las", "un", "una", "unos", "unas", "tu", "su",
+        }
+        last_token = normalized.rstrip(")]}\"'").split()[-1].lower()
+        return last_token in unfinished_tokens
 
     @staticmethod
     def _calculate_rms(audio_chunk: bytes) -> float:

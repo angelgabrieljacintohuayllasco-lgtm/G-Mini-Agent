@@ -116,6 +116,23 @@ class SettingsManager {
         this.tempSlider = document.getElementById('input-temperature');
         this.tempValue = document.getElementById('temp-value');
         this.keysContainer = document.getElementById('api-keys-container');
+        this.voiceTtsSelect = document.getElementById('select-tts-engine');
+        this.voiceRuntimeStatus = document.getElementById('voice-runtime-status');
+        this.voiceGoogleConfig = document.getElementById('voice-google-config');
+        this.voiceGoogleKeyInput = document.getElementById('input-voice-google-api-key');
+        this.voiceGoogleKeyToggleBtn = document.getElementById('btn-toggle-voice-google-key');
+        this.voiceGoogleKeySaveBtn = document.getElementById('btn-save-voice-google-key');
+        this.voiceGoogleKeyStatus = document.getElementById('key-status-voice-google');
+        this.voiceElevenlabsConfig = document.getElementById('voice-elevenlabs-config');
+        this.voiceElevenlabsKeyInput = document.getElementById('input-voice-elevenlabs-api-key');
+        this.voiceElevenlabsKeyToggleBtn = document.getElementById('btn-toggle-voice-elevenlabs-key');
+        this.voiceElevenlabsKeySaveBtn = document.getElementById('btn-save-voice-elevenlabs-key');
+        this.voiceElevenlabsKeyStatus = document.getElementById('key-status-voice-elevenlabs');
+        this.voiceElevenlabsVoiceIdInput = document.getElementById('input-elevenlabs-voice-id');
+        this.voiceSpeedSlider = document.getElementById('input-tts-speed');
+        this.voiceSpeedValue = document.getElementById('tts-speed-value');
+        this.voiceSpeedHelp = document.getElementById('voice-speed-help');
+        this.voiceMeta = document.getElementById('voice-character-meta');
         this.currentMode = 'normal';
         this.availableModes = [];
         this.availablePromptTemplates = [];
@@ -162,6 +179,10 @@ class SettingsManager {
         this.currentPage = 'general';
         this.currentModelAssignments = {};
         this.currentCrews = [];
+        this.voiceMetadata = null;
+        this.voiceApiKeyStatus = {};
+        this.voiceDraft = null;
+        this.voiceDraftDirty = false;
     }
 
     init() {
@@ -469,10 +490,40 @@ class SettingsManager {
         voiceSaveBtn?.addEventListener('click', async () => {
             await this._saveVoiceCharacterSettings();
         });
-        const ttsSpeedSlider = document.getElementById('input-tts-speed');
-        const ttsSpeedValue = document.getElementById('tts-speed-value');
-        ttsSpeedSlider?.addEventListener('input', (e) => {
-            if (ttsSpeedValue) ttsSpeedValue.textContent = e.target.value;
+        this.voiceTtsSelect?.addEventListener('change', () => {
+            this._updateVoiceDraft({ tts_primary: this.voiceTtsSelect.value || 'melotts' }, 'select-tts-engine:change');
+            this._renderVoiceEngineState();
+        });
+        this.voiceSpeedSlider?.addEventListener('input', (e) => {
+            if (this.voiceSpeedValue) this.voiceSpeedValue.textContent = e.target.value;
+            const nextSpeed = Number.parseFloat(e.target.value || '1.0');
+            this._updateVoiceDraft(
+                { tts_speed: Number.isFinite(nextSpeed) ? nextSpeed : 1.0 },
+                'tts-speed:input',
+            );
+        });
+        this.voiceElevenlabsVoiceIdInput?.addEventListener('input', (e) => {
+            this._updateVoiceDraft({ elevenlabs_voice_id: String(e.target.value || '') }, 'elevenlabs-voice-id:input');
+        });
+        document.getElementById('cb-auto-tts')?.addEventListener('change', (e) => {
+            this._updateVoiceDraft({ auto_tts: !!e.target.checked }, 'auto-tts:change');
+            this._renderVoiceEngineState();
+        });
+        document.getElementById('cb-voice-enabled')?.addEventListener('change', (e) => {
+            this._updateVoiceDraft({ enabled: !!e.target.checked }, 'voice-enabled:change');
+            this._renderVoiceEngineState();
+        });
+        this.voiceGoogleKeyToggleBtn?.addEventListener('click', () => {
+            this._togglePasswordInput(this.voiceGoogleKeyInput, this.voiceGoogleKeyToggleBtn);
+        });
+        this.voiceElevenlabsKeyToggleBtn?.addEventListener('click', () => {
+            this._togglePasswordInput(this.voiceElevenlabsKeyInput, this.voiceElevenlabsKeyToggleBtn);
+        });
+        this.voiceGoogleKeySaveBtn?.addEventListener('click', async () => {
+            await this._saveVoiceApiKey('google', this.voiceGoogleKeyInput);
+        });
+        this.voiceElevenlabsKeySaveBtn?.addEventListener('click', async () => {
+            await this._saveVoiceApiKey('elevenlabs', this.voiceElevenlabsKeyInput);
         });
 
         // Setup Generative Models Dropdowns
@@ -663,6 +714,325 @@ class SettingsManager {
         }
     }
 
+    _togglePasswordInput(input, button) {
+        if (!input || !button) return;
+        input.type = input.type === 'password' ? 'text' : 'password';
+        button.textContent = input.type === 'password' ? 'Ver' : 'Ocultar';
+    }
+
+    _cloneVoiceDebug(value) {
+        if (value === undefined) return undefined;
+        try {
+            return JSON.parse(JSON.stringify(value));
+        } catch (err) {
+            return String(value);
+        }
+    }
+
+    _voiceDebug(event, details = {}) {
+        console.log(`[Settings][Voice] ${event}`, this._cloneVoiceDebug(details));
+    }
+
+    _normalizeVoiceDraft(source = {}) {
+        const fallbackSettings = this.voiceMetadata?.settings || {};
+        const normalizedSpeed = Number.parseFloat(
+            String(source.tts_speed ?? fallbackSettings.tts_speed ?? '1.0'),
+        );
+        return {
+            tts_primary: String(source.tts_primary ?? fallbackSettings.tts_primary ?? 'melotts') || 'melotts',
+            tts_speed: Number.isFinite(normalizedSpeed) ? normalizedSpeed : 1.0,
+            elevenlabs_voice_id: String(
+                source.elevenlabs_voice_id ?? fallbackSettings.elevenlabs_voice_id ?? '',
+            ),
+            auto_tts: Boolean(source.auto_tts ?? fallbackSettings.auto_tts ?? false),
+            enabled: source.enabled === undefined
+                ? fallbackSettings.enabled !== false
+                : source.enabled !== false,
+        };
+    }
+
+    _buildVoiceDraftFromMetadata(data = this.voiceMetadata) {
+        return this._normalizeVoiceDraft(data?.settings || {});
+    }
+
+    _readVoiceDraftFromControls() {
+        const fallback = this._buildVoiceDraftFromMetadata();
+        const sliderValue = Number.parseFloat(String(this.voiceSpeedSlider?.value ?? fallback.tts_speed));
+        return this._normalizeVoiceDraft({
+            tts_primary: this.voiceTtsSelect?.value || this.voiceDraft?.tts_primary || fallback.tts_primary,
+            tts_speed: Number.isFinite(sliderValue) ? sliderValue : fallback.tts_speed,
+            elevenlabs_voice_id: this.voiceElevenlabsVoiceIdInput?.value ?? this.voiceDraft?.elevenlabs_voice_id ?? fallback.elevenlabs_voice_id,
+            auto_tts: document.getElementById('cb-auto-tts')?.checked ?? this.voiceDraft?.auto_tts ?? fallback.auto_tts,
+            enabled: document.getElementById('cb-voice-enabled')?.checked ?? this.voiceDraft?.enabled ?? fallback.enabled,
+        });
+    }
+
+    _getEffectiveVoiceDraft() {
+        if (this.voiceDraft) return this._normalizeVoiceDraft(this.voiceDraft);
+        return this._readVoiceDraftFromControls();
+    }
+
+    _getSelectedVoiceEngine() {
+        return this._getEffectiveVoiceDraft().tts_primary || 'melotts';
+    }
+
+    _hasVoicePendingChanges() {
+        const draft = this.voiceDraft;
+        const persisted = this.voiceMetadata?.settings;
+        if (!draft || !persisted) return false;
+        const normalizedDraft = this._normalizeVoiceDraft(draft);
+        const normalizedPersisted = this._normalizeVoiceDraft(persisted);
+        return ['tts_primary', 'elevenlabs_voice_id', 'auto_tts', 'enabled'].some(
+            (key) => normalizedDraft[key] !== normalizedPersisted[key],
+        ) || Math.abs(normalizedDraft.tts_speed - normalizedPersisted.tts_speed) > 0.0001;
+    }
+
+    _updateVoiceDraft(patch, reason = 'unknown') {
+        const before = this._cloneVoiceDebug(this.voiceDraft || this._readVoiceDraftFromControls());
+        const base = this.voiceDraft ? this._normalizeVoiceDraft(this.voiceDraft) : this._readVoiceDraftFromControls();
+        this.voiceDraft = this._normalizeVoiceDraft({ ...base, ...patch });
+        this.voiceDraftDirty = this._hasVoicePendingChanges();
+        this._voiceDebug('draft:update', {
+            reason,
+            patch,
+            before,
+            after: this.voiceDraft,
+            dirty: this.voiceDraftDirty,
+            persisted: this._cloneVoiceDebug(this.voiceMetadata?.settings || null),
+        });
+        return this.voiceDraft;
+    }
+
+    _applyVoiceDraftToControls(reason = 'unknown') {
+        const draft = this._getEffectiveVoiceDraft();
+        if (this.voiceTtsSelect) {
+            const hasOption = Array.from(this.voiceTtsSelect.options || []).some((option) => option.value === draft.tts_primary);
+            if (hasOption) {
+                this.voiceTtsSelect.value = draft.tts_primary;
+            }
+        }
+        if (this.voiceElevenlabsVoiceIdInput) {
+            this.voiceElevenlabsVoiceIdInput.value = draft.elevenlabs_voice_id || '';
+        }
+        if (this.voiceSpeedSlider) {
+            this.voiceSpeedSlider.value = String(draft.tts_speed ?? 1.0);
+        }
+        if (this.voiceSpeedValue) {
+            this.voiceSpeedValue.textContent = String(draft.tts_speed ?? 1.0);
+        }
+        const cbAuto = document.getElementById('cb-auto-tts');
+        if (cbAuto) cbAuto.checked = !!draft.auto_tts;
+        const cbEnabled = document.getElementById('cb-voice-enabled');
+        if (cbEnabled) cbEnabled.checked = !!draft.enabled;
+        this._voiceDebug('draft:apply-controls', {
+            reason,
+            draft,
+            selectedDomValue: this.voiceTtsSelect?.value || null,
+        });
+    }
+
+    _applyVoiceMetadataSnapshot(data, { preserveDraft = false, reason = 'unknown' } = {}) {
+        const previousDraft = this._cloneVoiceDebug(this.voiceDraft);
+        const persistedDraft = this._buildVoiceDraftFromMetadata(data);
+        const controlSnapshot = this._readVoiceDraftFromControls();
+        this.voiceMetadata = data || {};
+        this.voiceDraft = preserveDraft
+            ? this._normalizeVoiceDraft({ ...persistedDraft, ...(this.voiceDraft || controlSnapshot) })
+            : persistedDraft;
+        this.voiceDraftDirty = this._hasVoicePendingChanges();
+        this._voiceDebug('metadata:apply', {
+            reason,
+            preserveDraft,
+            previousDraft,
+            controlSnapshot,
+            persisted: persistedDraft,
+            nextDraft: this.voiceDraft,
+            runtime: this._cloneVoiceDebug(this.voiceMetadata?.runtime || null),
+        });
+        this._renderVoiceTtsOptions();
+        this._applyVoiceDraftToControls(reason);
+        this._renderVoiceEngineState();
+    }
+
+    async _saveVoiceApiKey(provider, inputEl) {
+        const key = String(inputEl?.value || '').trim();
+        if (!key) return;
+
+        this._voiceDebug('api-key:save:start', {
+            provider,
+            selectedBeforeSave: this.voiceTtsSelect?.value || null,
+            draftBeforeSave: this._cloneVoiceDebug(this._getEffectiveVoiceDraft()),
+            persistedBeforeSave: this._cloneVoiceDebug(this.voiceMetadata?.settings || null),
+            hasKey: !!key,
+        });
+
+        const ok = await this._saveApiKey(provider, key);
+        if (!ok) return;
+
+        inputEl.value = '';
+        if (provider === 'google') {
+            inputEl.placeholder = 'Guardada';
+        } else if (provider === 'elevenlabs') {
+            inputEl.placeholder = 'Guardada';
+        }
+
+        // Si el usuario tiene el motor TTS correspondiente seleccionado en el draft
+        // pero aún no persistido, guardarlo automáticamente para que se active con la nueva key.
+        const draftEngine = this.voiceDraft?.tts_primary || this.voiceTtsSelect?.value || '';
+        const persistedEngine = this.voiceMetadata?.settings?.tts_primary || '';
+        const isGoogleEngine = (e) => String(e || '').startsWith('gemini-');
+        const shouldAutoSaveEngine = (
+            (provider === 'google' && isGoogleEngine(draftEngine) && !isGoogleEngine(persistedEngine)) ||
+            (provider === 'elevenlabs' && draftEngine === 'elevenlabs' && persistedEngine !== 'elevenlabs')
+        );
+        if (shouldAutoSaveEngine) {
+            this._voiceDebug('api-key:save:auto-engine', { provider, draftEngine, persistedEngine });
+            await this._saveConfigValue('voice', 'tts_primary', draftEngine);
+        }
+
+        await this._checkApiKeyStatus();
+        await this._syncVoiceMetadata({ preserveDraft: true, reason: `api-key-save:${provider}` });
+        this._voiceDebug('api-key:save:done', {
+            provider,
+            selectedAfterSave: this.voiceTtsSelect?.value || null,
+            draftAfterSave: this._cloneVoiceDebug(this.voiceDraft),
+            persistedAfterSave: this._cloneVoiceDebug(this.voiceMetadata?.settings || null),
+            runtimeAfterSave: this._cloneVoiceDebug(this.voiceMetadata?.runtime || null),
+        });
+    }
+
+    _renderVoiceTtsOptions() {
+        if (!this.voiceTtsSelect) return;
+
+        const engines = Array.isArray(this.voiceMetadata?.engines) ? this.voiceMetadata.engines : [];
+        const selectedEngine = this._getSelectedVoiceEngine();
+        this.voiceTtsSelect.innerHTML = '';
+
+        if (engines.length === 0) {
+            this.voiceTtsSelect.appendChild(new Option('Sin motores disponibles', 'none'));
+            this.voiceTtsSelect.value = 'none';
+            this._voiceDebug('render:tts-options:empty', {
+                selectedEngine,
+                metadata: this._cloneVoiceDebug(this.voiceMetadata?.settings || null),
+            });
+            return;
+        }
+
+        engines.forEach((engine) => {
+            const option = new Option(engine.label || engine.id, engine.id);
+            this.voiceTtsSelect.appendChild(option);
+        });
+
+        this.voiceTtsSelect.value = engines.some((engine) => engine.id === selectedEngine)
+            ? selectedEngine
+            : engines[0].id;
+        this._voiceDebug('render:tts-options', {
+            selectedEngine,
+            domValue: this.voiceTtsSelect.value,
+            engineIds: engines.map((engine) => engine.id),
+            draft: this._cloneVoiceDebug(this.voiceDraft),
+            persisted: this._cloneVoiceDebug(this.voiceMetadata?.settings || null),
+        });
+    }
+
+    _setInlineKeyStatus(element, info) {
+        if (!element) return;
+        if (info && info.configured) {
+            element.textContent = `OK ${info.masked || ''}`.trim();
+            element.className = 'api-key-status set';
+        } else {
+            element.textContent = 'sin clave';
+            element.className = 'api-key-status unset';
+        }
+    }
+
+    _buildVoiceRuntimeText() {
+        const runtime = this.voiceMetadata?.runtime || {};
+        const engineList = Array.isArray(this.voiceMetadata?.engines) ? this.voiceMetadata.engines : [];
+        const selectedEngine = this._getSelectedVoiceEngine() || runtime.requested_engine || '';
+        const selectedMeta = engineList.find((engine) => engine.id === selectedEngine) || {};
+        const selectedLabel = selectedMeta.label || runtime.requested_label || 'Sin seleccionar';
+        const activeLabel = runtime.available
+            ? (runtime.active_label || runtime.active_engine || 'Activo')
+            : 'bloqueado';
+        const message = runtime.message ? ` ${runtime.message}` : '';
+        const warnings = Array.isArray(runtime.warnings) && runtime.warnings.length > 0
+            ? ` Avisos: ${runtime.warnings.join(' ')}`
+            : '';
+        const pendingSave = this.voiceDraftDirty
+            ? ' Cambio pendiente de guardar.'
+            : '';
+
+        return runtime.available
+            ? `Seleccionado: ${selectedLabel}. Activo: ${activeLabel}.${pendingSave}${warnings}`.trim()
+            : `Seleccionado: ${selectedLabel}. Activo: ${activeLabel}.${message}${pendingSave}${warnings}`.trim();
+    }
+
+    _renderVoiceEngineState() {
+        const selectedEngine = this._getSelectedVoiceEngine();
+        const engineList = Array.isArray(this.voiceMetadata?.engines) ? this.voiceMetadata.engines : [];
+        const selectedMeta = engineList.find((engine) => engine.id === selectedEngine) || {};
+        const provider = selectedMeta.provider || 'unknown';
+        const supportsNumericSpeed = selectedMeta.supports_numeric_speed !== false;
+
+        if (this.voiceGoogleConfig) {
+            this.voiceGoogleConfig.classList.toggle('hidden', provider !== 'google');
+        }
+        if (this.voiceElevenlabsConfig) {
+            this.voiceElevenlabsConfig.classList.toggle('hidden', selectedEngine !== 'elevenlabs');
+        }
+
+        if (this.voiceSpeedSlider) {
+            this.voiceSpeedSlider.disabled = !supportsNumericSpeed;
+        }
+        if (this.voiceSpeedHelp) {
+            const showSpeedHelp = provider === 'google';
+            this.voiceSpeedHelp.classList.toggle('hidden', !showSpeedHelp);
+            this.voiceSpeedHelp.textContent = showSpeedHelp
+                ? 'Google Gemini TTS no expone una velocidad numerica fija. El slider no aplica para estos modelos.'
+                : '';
+        }
+
+        this.voiceDraftDirty = this._hasVoicePendingChanges();
+        if (this.voiceRuntimeStatus) {
+            this.voiceRuntimeStatus.textContent = this._buildVoiceRuntimeText();
+        }
+        this._setInlineKeyStatus(this.voiceGoogleKeyStatus, this.voiceApiKeyStatus.google);
+        this._setInlineKeyStatus(this.voiceElevenlabsKeyStatus, this.voiceApiKeyStatus.elevenlabs);
+        this._voiceDebug('render:engine-state', {
+            selectedEngine,
+            provider,
+            supportsNumericSpeed,
+            draft: this._cloneVoiceDebug(this.voiceDraft),
+            persisted: this._cloneVoiceDebug(this.voiceMetadata?.settings || null),
+            runtime: this._cloneVoiceDebug(this.voiceMetadata?.runtime || null),
+            dirty: this.voiceDraftDirty,
+        });
+    }
+
+    async _syncVoiceMetadata({ preserveDraft = false, reason = 'sync' } = {}) {
+        this._voiceDebug('metadata:sync:start', {
+            reason,
+            preserveDraft,
+            currentDraft: this._cloneVoiceDebug(this.voiceDraft),
+            currentPersisted: this._cloneVoiceDebug(this.voiceMetadata?.settings || null),
+        });
+        try {
+            const resp = await fetch(`${BACKEND_API}/voice/metadata`);
+            if (!resp.ok) return;
+            const payload = await resp.json();
+            const data = payload?.data || {};
+            this._voiceDebug('metadata:sync:response', {
+                reason,
+                preserveDraft,
+                metadata: this._cloneVoiceDebug(data),
+            });
+            this._applyVoiceMetadataSnapshot(data, { preserveDraft, reason });
+        } catch (err) {
+            console.error('[Settings][Voice] Error sincronizando voice metadata:', err);
+        }
+    }
+
 
     async _syncModesFromBackend() {
         try {
@@ -707,6 +1077,7 @@ class SettingsManager {
             const resp = await fetch(`${BACKEND_API}/api-keys/status`);
             if (!resp.ok) return;
             const data = await resp.json();
+            this.voiceApiKeyStatus = data || {};
             for (const [provider, info] of Object.entries(data)) {
                 const statusEl = document.getElementById(`key-status-${provider}`);
                 if (!statusEl) continue;
@@ -718,6 +1089,7 @@ class SettingsManager {
                     statusEl.className = 'api-key-status unset';
                 }
             }
+            this._renderVoiceEngineState();
         } catch (err) {
             // Backend no disponible aún
         }
@@ -1137,24 +1509,16 @@ class SettingsManager {
             // Backend no listo
         }
         try {
-            const [voiceResp, charResp] = await Promise.all([
-                fetch(`${BACKEND_API}/config/voice`),
+            const [voiceMetaResp, charResp] = await Promise.all([
+                fetch(`${BACKEND_API}/voice/metadata`),
                 fetch(`${BACKEND_API}/config/character`),
             ]);
-            if (voiceResp.ok) {
-                const vd = (await voiceResp.json())?.data?.voice || {};
-                const selTts = document.getElementById('select-tts-engine');
-                const inpVoice = document.getElementById('input-elevenlabs-voice-id');
-                const inpSpeed = document.getElementById('input-tts-speed');
-                const speedVal = document.getElementById('tts-speed-value');
-                const cbAuto = document.getElementById('cb-auto-tts');
-                const cbEnabled = document.getElementById('cb-voice-enabled');
-                if (selTts) selTts.value = vd.tts_primary || 'melotts';
-                if (inpVoice) inpVoice.value = vd.elevenlabs_default_voice || '';
-                if (inpSpeed) inpSpeed.value = String(vd.tts_speed ?? 1.0);
-                if (speedVal) speedVal.textContent = String(vd.tts_speed ?? 1.0);
-                if (cbAuto) cbAuto.checked = !!vd.auto_tts;
-                if (cbEnabled) cbEnabled.checked = vd.enabled !== false;
+            if (voiceMetaResp.ok) {
+                const voiceData = (await voiceMetaResp.json())?.data || {};
+                this._applyVoiceMetadataSnapshot(voiceData, {
+                    preserveDraft: false,
+                    reason: 'syncFromBackend:initial-fetch',
+                });
             }
             if (charResp.ok) {
                 const cd = (await charResp.json())?.data?.character || {};
@@ -1170,6 +1534,7 @@ class SettingsManager {
         this._syncModesFromBackend();
         this._syncPromptTemplates();
         this._checkApiKeyStatus();
+        await this._syncVoiceMetadata({ preserveDraft: false, reason: 'syncFromBackend:final-refresh' });
         // Restore sidebar page selection
         if (this.currentPage) this._switchPage(this.currentPage);
         // Sync model assignments + crews
@@ -1788,16 +2153,33 @@ class SettingsManager {
     }
 
     async _saveVoiceCharacterSettings() {
-        const ttsEngine = document.getElementById('select-tts-engine')?.value || 'melotts';
-        const elevenVoiceId = document.getElementById('input-elevenlabs-voice-id')?.value || '';
-        const ttsSpeed = parseFloat(document.getElementById('input-tts-speed')?.value || '1.0');
+        const voiceDraft = this._readVoiceDraftFromControls();
+        this.voiceDraft = voiceDraft;
+        this.voiceDraftDirty = this._hasVoicePendingChanges();
+        const ttsEngine = voiceDraft.tts_primary || 'melotts';
+        const elevenVoiceId = voiceDraft.elevenlabs_voice_id || '';
+        const ttsSpeed = voiceDraft.tts_speed;
         const charType = document.getElementById('select-character-type')?.value || '2d';
-        const autoTts = !!document.getElementById('cb-auto-tts')?.checked;
-        const voiceEnabled = !!document.getElementById('cb-voice-enabled')?.checked;
+        const autoTts = !!voiceDraft.auto_tts;
+        const voiceEnabled = !!voiceDraft.enabled;
+        const debugPayload = {
+            tts_primary: ttsEngine,
+            elevenlabs_voice_id: elevenVoiceId,
+            tts_speed: ttsSpeed,
+            auto_tts: autoTts,
+            enabled: voiceEnabled,
+            character_type: charType,
+        };
+        this._voiceDebug('voice-settings:save:start', {
+            payload: debugPayload,
+            draftBeforeSave: this._cloneVoiceDebug(voiceDraft),
+            persistedBeforeSave: this._cloneVoiceDebug(this.voiceMetadata?.settings || null),
+            runtimeBeforeSave: this._cloneVoiceDebug(this.voiceMetadata?.runtime || null),
+        });
 
         const ops = [
             ['voice', 'tts_primary', ttsEngine],
-            ['voice', 'elevenlabs_default_voice', elevenVoiceId],
+            ['voice', 'elevenlabs_voice_id', elevenVoiceId],
             ['voice', 'tts_speed', ttsSpeed],
             ['voice', 'auto_tts', autoTts],
             ['voice', 'enabled', voiceEnabled],
@@ -1806,14 +2188,24 @@ class SettingsManager {
 
         let allOk = true;
         for (const [section, key, value] of ops) {
+            this._voiceDebug('voice-settings:save:operation', { section, key, value });
             const ok = await this._saveConfigValue(section, key, value);
             allOk = allOk && ok;
         }
 
-        const metaEl = document.getElementById('voice-character-meta');
+        await this._checkApiKeyStatus();
+        await this._syncVoiceMetadata({ preserveDraft: false, reason: 'voice-settings:save:commit' });
+        this._voiceDebug('voice-settings:save:done', {
+            allOk,
+            payload: debugPayload,
+            persistedAfterSave: this._cloneVoiceDebug(this.voiceMetadata?.settings || null),
+            runtimeAfterSave: this._cloneVoiceDebug(this.voiceMetadata?.runtime || null),
+            draftAfterSave: this._cloneVoiceDebug(this.voiceDraft),
+        });
+        const metaEl = this.voiceMeta;
         if (metaEl) {
             metaEl.textContent = allOk
-                ? 'Configuración de voz y personaje guardada.'
+                ? `Configuracion de voz y personaje guardada. ${this._buildVoiceRuntimeText()}`
                 : 'Error al guardar algunas opciones de voz.';
         }
     }

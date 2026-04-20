@@ -609,21 +609,43 @@
                     <div class="setting-group">
                         <label>Motor TTS</label>
                         <select id="select-tts-engine" class="setting-select">
-                            <option value="melotts">MeloTTS (offline)</option>
-                            <option value="elevenlabs">ElevenLabs (online)</option>
-                            <option value="gemini-2.5-pro-tts">Gemini 2.5 Pro TTS (online)</option>
-                            <option value="gemini-2.5-flash-tts">Gemini 2.5 Flash TTS (online)</option>
-                            <option value="gemini-2.5-flash-lite-preview-tts">Gemini 2.5 Flash Lite TTS (online)</option>
-                            <option value="chirp_3">Chirp 3 (online)</option>
-                            <option value="chirp_2">Chirp 2 (online)</option>
-                            <option value="none">Desactivado</option>
+                            <option value="">Cargando motores...</option>
                         </select>
+                        <div id="voice-runtime-status" class="setting-help-text"></div>
+                    </div>
+
+                    <div id="voice-google-config" class="setting-group hidden">
+                        <label>Google TTS</label>
+                        <div class="api-key-row">
+                            <label>API key</label>
+                            <div class="api-key-input-group">
+                                <input id="input-voice-google-api-key" class="api-key-input" type="password" placeholder="AIza... o clave API" autocomplete="off">
+                                <button id="btn-toggle-voice-google-key" class="btn-toggle-key" type="button" title="Mostrar u ocultar clave">Ver</button>
+                            </div>
+                            <span class="api-key-status" id="key-status-voice-google">-</span>
+                            <button id="btn-save-voice-google-key" class="btn-secondary" type="button">Guardar</button>
+                        </div>
+                        <div class="setting-help-text">Google TTS usa la misma API key del provider Google/Gemini.</div>
+                    </div>
+
+                    <div id="voice-elevenlabs-config" class="setting-group hidden">
+                        <label>ElevenLabs</label>
+                        <div class="api-key-row">
+                            <label>API key</label>
+                            <div class="api-key-input-group">
+                                <input id="input-voice-elevenlabs-api-key" class="api-key-input" type="password" placeholder="sk_... o clave API" autocomplete="off">
+                                <button id="btn-toggle-voice-elevenlabs-key" class="btn-toggle-key" type="button" title="Mostrar u ocultar clave">Ver</button>
+                            </div>
+                            <span class="api-key-status" id="key-status-voice-elevenlabs">-</span>
+                            <button id="btn-save-voice-elevenlabs-key" class="btn-secondary" type="button">Guardar</button>
+                        </div>
                         <input id="input-elevenlabs-voice-id" class="setting-input" type="text" placeholder="Voice ID de ElevenLabs (opcional)">
                     </div>
 
                     <div class="setting-group">
                         <label>Velocidad TTS: <span id="tts-speed-value">1.0</span></label>
                         <input type="range" id="input-tts-speed" class="setting-range" min="0.5" max="2" step="0.1" value="1.0">
+                        <div id="voice-speed-help" class="setting-help-text hidden"></div>
                     </div>
 
                     <div class="setting-group">

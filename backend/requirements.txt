@@ -15,6 +15,7 @@ discord.py>=2.4.0
 # LLM Providers — SDKs actualizados para modelos actuales
 openai>=1.82.0            # GPT-5.4 series, Responses API, Realtime
 anthropic>=0.52.0         # Claude Opus 4.6, Sonnet 4.6, extended thinking
+cohere>=5.9.0             # Command R+ series
 google-genai>=1.14.0      # Gemini 3.1 Pro, 3 Flash, google-genai SDK
 
 # Token counting

@@ -489,11 +489,13 @@ security:
 voice:
   enabled: false            # Se activa en Fase 3
   auto_tts: false           # Sintetizar voz automáticamente en cada respuesta
-  tts_primary: "melotts"    # melotts | elevenlabs
+  tts_primary: "melotts"    # melotts | elevenlabs | gemini-3.1-flash-tts-preview | gemini-2.5-flash-preview-tts | gemini-2.5-pro-preview-tts | none
   tts_fallback: "melotts"
+  tts_speed: 1.0
   stt_engine: "faster-whisper"
   stt_model: "large-v3"
   stt_language: "es"
+  elevenlabs_voice_id: ""
   elevenlabs:
     api_key_vault: "elevenlabs_api"
     default_voice: ""
